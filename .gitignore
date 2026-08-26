@@ -1,0 +1,24 @@
+# Private CAD samples and generated documents
+samples/private/
+*.prt
+*.pdf
+
+# Build and test output
+**/bin/
+**/obj/
+.vs/
+.tools/
+artifacts/
+TestResults/
+coverage/
+
+# Runtime state
+*.log
+*.tmp
+*.bak
+*.user
+*.suo
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
