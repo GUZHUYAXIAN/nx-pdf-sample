@@ -9,6 +9,7 @@ PDFsharp 6.2.4
 --------------
 
 Project URL:   https://github.com/empira/PDFsharp
+Documentation: https://docs.pdfsharp.net/
 Package:       https://www.nuget.org/packages/PDFsharp/6.2.4
 License:       MIT
 
@@ -19,7 +20,7 @@ validation in the GUI process. It never participates in the NX export itself.
 
 MIT License
 
-Copyright (c) 2005-2024 empira Software GmbH, Cologne (Germany)
+Copyright (c) 2026 empira
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
