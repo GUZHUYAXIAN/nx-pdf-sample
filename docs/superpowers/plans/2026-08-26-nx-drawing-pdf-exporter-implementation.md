@@ -166,11 +166,13 @@ Result: committed together with the updated plan checkboxes (Task 1 steps 1–7)
 - Create: `src/NxDrawingPdfExporter.Contracts/JobJsonSerializer.cs`
 - Test: `tests/NxDrawingPdfExporter.Contracts.Tests/JobJsonSerializerTests.cs`
 
-- [ ] **Step 1: Write failing round-trip and validation tests**
+- [x] **Step 1: Write failing round-trip and validation tests**
 
 Cover Unicode/space paths, every result status, ordered job items, missing required fields, unknown protocol version, and a malformed JSON file. The test must assert that no plaintext exception stack is stored in user-facing `Message`.
 
-- [ ] **Step 2: Run the focused test and confirm RED**
+Result: 11 tests in `JobJsonSerializerTests` covering all mandated cases; RED confirmed via CS0246 compile failure (DTOs absent).
+
+- [x] **Step 2: Run the focused test and confirm RED**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Contracts.Tests\NxDrawingPdfExporter.Contracts.Tests.csproj --no-restore --filter FullyQualifiedName~JobJsonSerializerTests
