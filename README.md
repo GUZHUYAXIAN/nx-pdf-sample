@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-截至 2026-08-26，项目只有已批准的设计基线和私有真机样例，尚未开始产品代码实现。下一步是由用户审阅书面规格；规格批准后才能编写实施计划和外部开发提示词。
+截至 2026-08-26，书面规格已获用户批准，产品代码尚未开始实现。实施计划和外部开发提示词已经形成；开发者只能按批准的计划执行，并须先通过 NX Worker 真机启动门槛。
 
 ## 已批准的核心行为
 
@@ -28,6 +28,8 @@
 ## 设计文档
 
 - `docs/superpowers/specs/2026-08-26-nx-drawing-pdf-exporter-design.md`
+- `docs/superpowers/plans/2026-08-26-nx-drawing-pdf-exporter-implementation.md`
+- `docs/prompts/2026-08-26-opencode-development-prompt.md`
 
 ## 外部开发边界
 
