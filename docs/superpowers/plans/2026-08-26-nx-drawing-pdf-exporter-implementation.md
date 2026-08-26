@@ -83,7 +83,7 @@ Set-Location -LiteralPath $taskRoot
 - Create: `tests/NxDrawingPdfExporter.Core.Tests/NxDrawingPdfExporter.Core.Tests.csproj`
 - Create: `tests/NxDrawingPdfExporter.App.Tests/NxDrawingPdfExporter.App.Tests.csproj`
 
-- [ ] **Step 1: Create and switch to the implementation branch**
+- [x] **Step 1: Create and switch to the implementation branch**
 
 ```powershell
 git status --short
@@ -92,7 +92,9 @@ git switch -c feature/nx-drawing-pdf-exporter-v1
 
 Expected: the pre-switch status is clean; the new branch is based on `22c3c21` plus the approved documentation commit.
 
-- [ ] **Step 2: Pin SDK and deterministic build defaults**
+Result: clean `main` at `a9b2857`; branch `feature/nx-drawing-pdf-exporter-v1` created.
+
+- [x] **Step 2: Pin SDK and deterministic build defaults**
 
 `global.json` pins `10.0.400` with `rollForward: latestPatch`. `Directory.Build.props` enables nullable, deterministic builds, `TreatWarningsAsErrors`, and does not set a global target framework.
 
@@ -132,7 +134,7 @@ Tests -> their production project
 
 Task 1 只创建 App 的空项目边界，使解决方案与测试引用可还原；任何 WinForms 窗体、控制器或产品 GUI 行为都必须等 Worker gate 1 通过后再写。
 
-- [ ] **Step 6: Restore/build boundary check**
+- [x] **Step 6: Restore/build boundary check**
 
 ```powershell
 & $taskDotnet restore .\NxDrawingPdfExporter.slnx
@@ -141,12 +143,16 @@ Task 1 只创建 App 的空项目边界，使解决方案与测试引用可还�
 
 Expected: either clean success, or a precise missing-package stop. No automatic download is allowed without the user's separate approval.
 
-- [ ] **Step 7: Commit**
+Result: precise missing-package stop with zero network traffic (restore executed against an empty local feed override). Local caches seeded offline from the adjacent project's cache cover MSTest 4.0.2 full closure incl. transitive deps. Remaining machine-missing packages pending user authorization: `PDFsharp 6.2.4` (approved dependency), `NETStandard.Library 2.0.0` and `Microsoft.NETFramework.ReferenceAssemblies.net48 1.0.3` (SDK-required build infrastructure; this machine has no VS targeting packs). All land in repo-local `.tools/nuget-packages`.
+
+- [x] **Step 7: Commit**
 
 ```powershell
 git add global.json Directory.Build.props Directory.Packages.props NuGet.Config THIRD-PARTY-NOTICES.txt NxDrawingPdfExporter.slnx src tests tools
 git commit -m "build: scaffold exporter solution"
 ```
+
+Result: committed together with the updated plan checkboxes (Task 1 steps 1–7).
 
 ### Task 2: Define the versioned job/result protocol
 

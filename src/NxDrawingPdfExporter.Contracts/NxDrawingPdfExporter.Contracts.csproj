@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Versioned cross-process job/result protocol DTOs.
+    Shared by netstandard2.0 Core/App and the net48 Worker without extra JSON dependencies.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>NxDrawingPdfExporter.Contracts</RootNamespace>
+    <AssemblyName>NxDrawingPdfExporter.Contracts</AssemblyName>
+  </PropertyGroup>
+
+</Project>

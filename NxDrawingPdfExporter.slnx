@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="src/NxDrawingPdfExporter.Contracts/NxDrawingPdfExporter.Contracts.csproj" />
+  <Project Path="src/NxDrawingPdfExporter.Core/NxDrawingPdfExporter.Core.csproj" />
+  <Project Path="src/NxDrawingPdfExporter.App/NxDrawingPdfExporter.App.csproj" />
+  <Project Path="src/NxDrawingPdfExporter.Worker/NxDrawingPdfExporter.Worker.csproj" />
+  <Project Path="tools/NxDrawingPdfExporter.Probe/NxDrawingPdfExporter.Probe.csproj" />
+  <Project Path="tests/NxDrawingPdfExporter.Contracts.Tests/NxDrawingPdfExporter.Contracts.Tests.csproj" />
+  <Project Path="tests/NxDrawingPdfExporter.Core.Tests/NxDrawingPdfExporter.Core.Tests.csproj" />
+  <Project Path="tests/NxDrawingPdfExporter.App.Tests/NxDrawingPdfExporter.App.Tests.csproj" />
+</Solution>

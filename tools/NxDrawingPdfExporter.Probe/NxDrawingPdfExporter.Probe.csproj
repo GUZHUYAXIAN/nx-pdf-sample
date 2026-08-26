@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Minimal NX session probe (Gate 1). Launched only through the verified local
+    NX 10 run_managed.exe. Task 3 adds exact local NXOpen HintPaths with
+    Private=false and the real probe implementation.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>NxDrawingPdfExporter.Probe</RootNamespace>
+    <AssemblyName>NxDrawingPdfExporter.Probe</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NxDrawingPdfExporter.Contracts\NxDrawingPdfExporter.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

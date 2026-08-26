@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NX 10 Worker boundary (Task 1: empty net48 x64 class library; Task 3 adds
+    the exact local NXOpen HintPath references with Private=false; Task 6 turns
+    this into the run_managed.exe-launched executable).
+    Siemens DLLs are referenced from the local NX installation only and are
+    never copied, committed, or redistributed.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>NxDrawingPdfExporter.Worker</RootNamespace>
+    <AssemblyName>NxDrawingPdfExporter.Worker</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NxDrawingPdfExporter.Contracts\NxDrawingPdfExporter.Contracts.csproj" />
+    <ProjectReference Include="..\NxDrawingPdfExporter.Core\NxDrawingPdfExporter.Core.csproj" />
+  </ItemGroup>
+
+</Project>
