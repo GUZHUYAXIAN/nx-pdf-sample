@@ -1,0 +1,16 @@
+﻿{
+  "protocolVersion": "1",
+  "probeKind": "nx-session-probe",
+  "utcTimestamp": "2026-08-26T13:49:28.7165563Z",
+  "processBitness": "x64",
+  "runtimeVersion": "4.0.30319.42000",
+  "targetFramework": "net48",
+  "currentDirectory": "E:\\Codex\\projects\\nx-pdf-sample\\artifacts\\gate-1\\20260826-134928",
+  "argumentEcho": ["E:\\Codex\\projects\\nx-pdf-sample\\artifacts\\gate-1\\20260826-134928\\probe-report.json"],
+  "nxSessionAvailable": true,
+  "ufSessionAvailable": true,
+  "nxRootEnvironment": "D:\\Program Files\\Siemens\\NX 10.0\\UGII\\",
+  "exitCode": 0,
+  "error": ""
+}
+

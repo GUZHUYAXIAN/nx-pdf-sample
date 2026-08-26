@@ -1,0 +1,46 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    Exact local Siemens NX 10 references. Shared verbatim by the Probe (tools/)
+    and the Worker (src/) so both binaries bind to the same verified assembly
+    versions. Private=false: Siemens DLLs are never copied to output, never
+    committed, never redistributed. At runtime they are loaded from the local
+    NX installation that launched the process via run_managed.exe.
+  -->
+
+  <PropertyGroup>
+    <NxRoot>D:\Program Files\Siemens\NX 10.0</NxRoot>
+    <NxManagedDir>$(NxRoot)\UGII\managed</NxManagedDir>
+    <NxOpenDll>$(NxManagedDir)\NXOpen.dll</NxOpenDll>
+    <NxOpenUfDll>$(NxManagedDir)\NXOpen.UF.dll</NxOpenUfDll>
+    <NxOpenUtilitiesDll>$(NxManagedDir)\NXOpen.Utilities.dll</NxOpenUtilitiesDll>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="NXOpen">
+      <HintPath>$(NxOpenDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NXOpen.UF">
+      <HintPath>$(NxOpenUfDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- BaseSession lives here; required to compile against NXOpen types. -->
+    <Reference Include="NXOpen.Utilities">
+      <HintPath>$(NxOpenUtilitiesDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="VerifyLocalNxAssemblies" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(NxOpenDll)')"
+           Text="本机 NX 10 未找到 NXOpen.dll：$(NxOpenDll)。本项目只允许引用已安装的 Siemens NX 10.0。" />
+    <Error Condition="!Exists('$(NxOpenUfDll)')"
+           Text="本机 NX 10 未找到 NXOpen.UF.dll：$(NxOpenUfDll)。本项目只允许引用已安装的 Siemens NX 10.0。" />
+    <Error Condition="!Exists('$(NxOpenUtilitiesDll)')"
+           Text="本机 NX 10 未找到 NXOpen.Utilities.dll：$(NxOpenUtilitiesDll)。本项目只允许引用已安装的 Siemens NX 10.0。" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$fv = [System.Diagnostics.FileVersionInfo]::GetVersionInfo('$(NxOpenDll)').FileVersion; if ($fv -ne '10.0.0.24') { Write-Error (&quot;NXOpen.dll FileVersion 意外: {0}（要求 10.0.0.24）&quot; -f $fv); exit 1 }; exit 0&quot;"
+          IgnoreExitCode="false" />
+  </Target>
+
+</Project>

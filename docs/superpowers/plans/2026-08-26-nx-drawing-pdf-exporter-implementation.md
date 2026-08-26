@@ -180,7 +180,7 @@ Result: 11 tests in `JobJsonSerializerTests` covering all mandated cases; RED co
 
 Expected: compile/test failure because DTOs and serializer do not exist.
 
-- [ ] **Step 3: Implement stable DTOs**
+- [x] **Step 3: Implement stable DTOs**
 
 Use `DataContractJsonSerializer` so both `netstandard2.0` and `net48` use the same protocol without another JSON dependency. Required shapes:
 
@@ -217,11 +217,11 @@ public sealed class JobItem
 
 `FileResult` carries source/target/status/message, ordered exported/skipped sheet names, and elapsed milliseconds. `JobResult` carries run id, start/end UTC, cancellation state, ordered per-file results, and fatal worker error.
 
-- [ ] **Step 4: Implement atomic JSON writes**
+- [x] **Step 4: Implement atomic JSON writes**
 
 Serialize to a same-directory unique temporary file, flush/close, then move/replace. Deserialization validates protocol version and required absolute paths.
 
-- [ ] **Step 5: Run GREEN and full contract tests**
+- [x] **Step 5: Run GREEN and full contract tests**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Contracts.Tests\NxDrawingPdfExporter.Contracts.Tests.csproj --no-restore
@@ -229,7 +229,7 @@ Serialize to a same-directory unique temporary file, flush/close, then move/repl
 
 Expected: all contract tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/NxDrawingPdfExporter.Contracts tests/NxDrawingPdfExporter.Contracts.Tests
@@ -244,7 +244,7 @@ git commit -m "feat: define worker job protocol"
 - Create: `tools/run-worker-probe.ps1`
 - Create: `docs/verification/gate-1/README.md`
 
-- [ ] **Step 1: Configure exact NX references without redistribution**
+- [x] **Step 1: Configure exact NX references without redistribution**
 
 Worker and Probe csproj files use explicit `HintPath` values below and `<Private>false</Private>`:
 
@@ -261,7 +261,7 @@ Worker and Probe csproj files use explicit `HintPath` values below and `<Private
 
 Assert x64 and `net48`. Add an MSBuild target that fails if either file is absent or if `NXOpen.dll` file version is not `10.0.0.24`.
 
-- [ ] **Step 2: Implement the minimal probe only**
+- [x] **Step 2: Implement the minimal probe only**
 
 The probe obtains real objects and writes one UTF-8 JSON report:
 
@@ -273,7 +273,7 @@ if (session == null || ufSession == null) return 20;
 
 Report process bitness, runtime version, current directory, argument echo, NX session availability, UF session availability, NX executable root, UTC timestamp, and exit code. Do not open any PRT yet.
 
-- [ ] **Step 3: Build and check no Siemens binaries were copied**
+- [x] **Step 3: Build and check no Siemens binaries were copied**
 
 ```powershell
 & $taskDotnet build .\tools\NxDrawingPdfExporter.Probe\NxDrawingPdfExporter.Probe.csproj -c Debug --no-restore
@@ -288,11 +288,11 @@ Expected: build succeeds; the second command returns no files.
 
 Expected gate result: exit code 0, valid JSON, both Session fields true, argument echo exact.
 
-- [ ] **Step 5: Hard stop on gate failure**
+- [x] **Step 5: Hard stop on gate failure**
 
 If NX rejects `net48`, cannot load the assembly, or cannot return both real sessions, stop all implementation. Record error and environment facts, then ask for a spec revision. Do not implement GUI or silently switch framework/launcher.
 
-- [ ] **Step 6: Commit successful gate evidence**
+- [x] **Step 6: Commit successful gate evidence**
 
 ```powershell
 git add tools/NxDrawingPdfExporter.Probe tools/run-worker-probe.ps1 docs/verification/gate-1
