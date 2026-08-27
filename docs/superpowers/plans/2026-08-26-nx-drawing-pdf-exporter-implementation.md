@@ -309,21 +309,21 @@ git commit -m "test: prove NX 10 managed worker launch"
 - Test: `tests/NxDrawingPdfExporter.Core.Tests/InputDiscoveryServiceTests.cs`
 - Test: `tests/NxDrawingPdfExporter.Core.Tests/OutputPlannerTests.cs`
 
-- [ ] **Step 1: Write failing discovery tests**
+- [x] **Step 1: Write failing discovery tests**
 
 Cover current-directory scan, recursive opt-in, `.prt` case-insensitivity, manual multi-select order, canonical-path de-duplication, Chinese/spaces/multiple dots, missing files, and inaccessible folders. Do not infer a drawing from `DWG_`.
 
-- [ ] **Step 2: Write failing output-plan tests**
+- [x] **Step 2: Write failing output-plan tests**
 
 Cover source-basename preservation, beside-source/unified output, skip/overwrite, all colliding unified-output items marked `NameConflict`, target-directory validation, and no partial preflight mutation.
 
-- [ ] **Step 3: Confirm RED**
+- [x] **Step 3: Confirm RED**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Core.Tests\NxDrawingPdfExporter.Core.Tests.csproj --no-restore --filter "FullyQualifiedName~InputDiscoveryServiceTests|FullyQualifiedName~OutputPlannerTests"
 ```
 
-- [ ] **Step 4: Implement the smallest pure services**
+- [x] **Step 4: Implement the smallest pure services**
 
 Key contract:
 
@@ -346,7 +346,7 @@ public interface IOutputPlanner
 
 Preserve discovery/manual order; never sort by sheet or source filename unless the UI explicitly displays a separate view without altering job order.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Core.Tests\NxDrawingPdfExporter.Core.Tests.csproj --no-restore
