@@ -98,7 +98,7 @@ Result: clean `main` at `a9b2857`; branch `feature/nx-drawing-pdf-exporter-v1` c
 
 `global.json` pins `10.0.400` with `rollForward: latestPatch`. `Directory.Build.props` enables nullable, deterministic builds, `TreatWarningsAsErrors`, and does not set a global target framework.
 
-- [ ] **Step 3: Pin only reviewed packages**
+- [x] **Step 3: Pin only reviewed packages**
 
 `Directory.Packages.props`:
 
@@ -116,11 +116,11 @@ Result: clean `main` at `a9b2857`; branch `feature/nx-drawing-pdf-exporter-v1` c
 
 `NuGet.Config` must declare only `https://api.nuget.org/v3/index.json`; a restore that requires network is an explicit authorization gate, not an automatic step.
 
-- [ ] **Step 4: Record PDFsharp distribution impact**
+- [x] **Step 4: Record PDFsharp distribution impact**
 
 `THIRD-PARTY-NOTICES.txt` includes PDFsharp name, version, project URL, MIT copyright/license text, and states that its managed runtime assemblies are included in the GUI distribution. No Siemens file appears in this notice or package.
 
-- [ ] **Step 5: Create project graph**
+- [x] **Step 5: Create project graph**
 
 References must be exactly:
 
@@ -282,7 +282,7 @@ Get-ChildItem .\tools\NxDrawingPdfExporter.Probe\bin\Debug -Recurse -Include NXO
 
 Expected: build succeeds; the second command returns no files.
 
-- [ ] **Step 4: Discover and record the real `run_managed.exe` command syntax**
+- [x] **Step 4: Discover and record the real `run_managed.exe` command syntax**
 
 `tools/run-worker-probe.ps1` invokes only the verified local launcher and the built probe. It must capture exact command line, stdout, stderr, exit code, and report path under `docs/verification/gate-1/` while excluding usernames and sample paths from committed artifacts.
 

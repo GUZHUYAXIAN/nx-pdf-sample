@@ -44,6 +44,11 @@ namespace NxDrawingPdfExporter.Contracts
                 throw new ProtocolException($"协议 JSON 解析失败: {Sanitize(error.Message)}", error);
             }
 
+            if (raw is null)
+            {
+                throw new ProtocolException("协议 JSON 根对象不能为空。");
+            }
+
             if (raw is JobRequest request)
             {
                 Validate(request);
@@ -184,11 +189,7 @@ namespace NxDrawingPdfExporter.Contracts
 
             if (request.OutputMode == OutputMode.UnifiedDirectory)
             {
-                var unified = request.UnifiedOutputDirectory;
-                if (unified != null && unified.Length > 0)
-                {
-                    RequireAbsolute(unified, "UnifiedOutputDirectory");
-                }
+                RequireAbsolute(request.UnifiedOutputDirectory ?? string.Empty, "UnifiedOutputDirectory");
             }
         }
 

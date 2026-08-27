@@ -272,6 +272,38 @@ namespace NxDrawingPdfExporter.Contracts.Tests
             Assert.ThrowsExactly<ProtocolException>(() => JobJsonSerializer.Deserialize<JobRequest>(json));
         }
 
+        [TestMethod]
+        public void Deserialize_NullJsonRoot_ThrowsProtocolException()
+        {
+            Assert.ThrowsExactly<ProtocolException>(() => JobJsonSerializer.Deserialize<JobRequest>("null"));
+        }
+
+        [TestMethod]
+        public void Deserialize_UnifiedOutputMode_MissingDirectory_ThrowsProtocolException()
+        {
+            AssertInvalidUnifiedOutputDirectory(null);
+        }
+
+        [TestMethod]
+        public void Deserialize_UnifiedOutputMode_BlankDirectory_ThrowsProtocolException()
+        {
+            AssertInvalidUnifiedOutputDirectory("   ");
+        }
+
+        [TestMethod]
+        public void Deserialize_UnifiedOutputMode_RelativeDirectory_ThrowsProtocolException()
+        {
+            AssertInvalidUnifiedOutputDirectory("relative-output");
+        }
+
+        private static void AssertInvalidUnifiedOutputDirectory(string? unifiedDirectory)
+        {
+            var request = BuildFullRequest();
+            request.UnifiedOutputDirectory = unifiedDirectory;
+            var json = JobJsonSerializer.Serialize(request);
+            Assert.ThrowsExactly<ProtocolException>(() => JobJsonSerializer.Deserialize<JobRequest>(json));
+        }
+
         private static Regex StackFramePattern() => new Regex("\\r?\\n\\s*at ", RegexOptions.Compiled);
 
         private static Regex NewLinePattern() => new Regex("\\r?\\n", RegexOptions.Compiled);
