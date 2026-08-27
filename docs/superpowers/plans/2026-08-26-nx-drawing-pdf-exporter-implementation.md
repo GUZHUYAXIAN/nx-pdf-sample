@@ -361,17 +361,17 @@ git commit -m "feat: add input and output preflight"
 - Create: `src/NxDrawingPdfExporter.Core/Drawing/SheetSelectionService.cs`
 - Test: `tests/NxDrawingPdfExporter.Core.Tests/SheetSelectionServiceTests.cs`
 
-- [ ] **Step 1: Write failing tests for the approved rule**
+- [x] **Step 1: Write failing tests for the approved rule**
 
 Tests must prove: zero sheets => pure model; sheets with zero drafting views => no valid sheets; one or more drafting views => exportable; input order retained; update/load error => file failure rather than blank/template classification.
 
-- [ ] **Step 2: Confirm RED**
+- [x] **Step 2: Confirm RED**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Core.Tests\NxDrawingPdfExporter.Core.Tests.csproj --no-restore --filter FullyQualifiedName~SheetSelectionServiceTests
 ```
 
-- [ ] **Step 3: Implement explicit facts and decisions**
+- [x] **Step 3: Implement explicit facts and decisions**
 
 ```csharp
 public sealed class SheetFacts
@@ -392,7 +392,7 @@ public sealed class SheetSelection
 
 Do not inspect borders, notes, tables, layer numbers, names, or prefixes. `DraftingViewCount >= 1` is the only positive rule.
 
-- [ ] **Step 4: Run GREEN and commit**
+- [x] **Step 4: Run GREEN and commit**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Core.Tests\NxDrawingPdfExporter.Core.Tests.csproj --no-restore
