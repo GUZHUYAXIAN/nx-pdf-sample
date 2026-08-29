@@ -70,13 +70,9 @@ namespace NxDrawingPdfExporter.Worker
             catch (Exception error)
             {
                 Console.Error.WriteLine(error.ToString());
-                result = new JobResult
-                {
-                    RunId = request.RunId,
-                    StartedUtc = DateTime.UtcNow,
-                    EndedUtc = DateTime.UtcNow,
-                    FatalError = Sanitize(error.Message)
-                };
+                // 致命错误不得销毁批处理运行器已持久化的逐文件快照：
+                // 读取最后一份可信快照并补写未决条目的失败结果。
+                result = FatalResultMerger.Merge(request, TryReadResultSnapshot(request.ResultPath), error.Message, DateTime.UtcNow);
             }
 
             try
@@ -94,6 +90,23 @@ namespace NxDrawingPdfExporter.Worker
             return result.Files.Any(f => f.Status == FileResultStatus.Failed) || result.FatalError != null
                 ? ExportFailure
                 : 0;
+        }
+
+        /// <summary>
+        /// 读取最后一份持久化快照用于致命合并。缺失或损坏时返回 null：
+        /// 合并器随后把所有条目标记为失败，本次运行仍以非零码退出，
+        /// 不会把“没有可恢复结果”误报为成功。
+        /// </summary>
+        private static JobResult? TryReadResultSnapshot(string resultPath)
+        {
+            try
+            {
+                return JobJsonSerializer.ReadFromFile<JobResult>(resultPath);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         private static int RunInventory(string sourcePath, string reportPath)
