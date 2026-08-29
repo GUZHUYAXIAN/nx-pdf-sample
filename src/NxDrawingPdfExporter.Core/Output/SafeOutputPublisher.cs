@@ -110,10 +110,16 @@ namespace NxDrawingPdfExporter.Core.Output
                 return "临时 PDF 是空文件。";
             }
 
+            return ValidatePdfContent(request.TempPdfPath, request.ExpectedPageCount);
+        }
+
+        /// <summary>PDF 内容规则：有效文件头 + 页数与有效图纸页数一致。</summary>
+        private string? ValidatePdfContent(string path, int expectedPageCount)
+        {
             PdfInspection inspection;
             try
             {
-                inspection = inspector.Inspect(request.TempPdfPath);
+                inspection = inspector.Inspect(path);
             }
             catch (Exception ex)
             {
@@ -122,12 +128,12 @@ namespace NxDrawingPdfExporter.Core.Output
 
             if (!inspection.HasPdfHeader)
             {
-                return "临时 PDF 不是有效的 PDF 文件（缺少 PDF 文件头）。";
+                return "PDF 不是有效的 PDF 文件（缺少 PDF 文件头）。";
             }
 
-            if (inspection.PageCount != request.ExpectedPageCount)
+            if (inspection.PageCount != expectedPageCount)
             {
-                return $"PDF 页数 {inspection.PageCount} 与有效图纸页数 {request.ExpectedPageCount} 不一致。";
+                return $"PDF 页数 {inspection.PageCount} 与有效图纸页数 {expectedPageCount} 不一致。";
             }
 
             return null;
@@ -174,6 +180,14 @@ namespace NxDrawingPdfExporter.Core.Output
             if (!File.Exists(request.FinalOutputPath) || new FileInfo(request.FinalOutputPath).Length == 0)
             {
                 return FailReplace(request, backupPath, "替换后的 PDF 无效。");
+            }
+
+            // 替换完成后必须按同一规则对最终文件复验，通过才允许删除备份；
+            // 复验失败则从备份恢复原有文件。
+            var finalFailure = ValidatePdfContent(request.FinalOutputPath, request.ExpectedPageCount);
+            if (finalFailure is not null)
+            {
+                return FailReplace(request, backupPath, "替换后的 PDF 未通过复验: " + finalFailure);
             }
 
             replacer.DeleteFile(backupPath);
