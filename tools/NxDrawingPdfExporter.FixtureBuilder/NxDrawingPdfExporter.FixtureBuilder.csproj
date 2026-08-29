@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Gate 3 fixture builder (validation-only, not product): creates a NEW
+    synthetic PRT that contains a drawing sheet with zero drafting views,
+    used by the no-valid-sheet scenario. Runs through the verified
+    run_managed.exe path. It saves only the brand-new part it creates;
+    it never opens, saves, or mutates any sample PRT.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>NxDrawingPdfExporter.FixtureBuilder</RootNamespace>
+    <AssemblyName>NxDrawingPdfExporter.FixtureBuilder</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <!-- Same exact local NXOpen references and version guard as the Worker. -->
+  <Import Project="..\..\build\NxReference.props" />
+
+</Project>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -20,9 +20,10 @@ namespace NxDrawingPdfExporter.Contracts.Tests
                 {
                     new JobItem
                     {
-                        SourcePath = @"E:\图纸 目录\PRIVATE_SAMPLE_A.prt",
-                        FinalOutputPath = @"E:\图纸 目录\PRIVATE_SAMPLE_A.pdf",
-                        WorkerTempOutputPath = @"E:\图纸 目录\.PRIVATE_SAMPLE_A.run-20260826-01.9f2c.tmp.pdf"
+                        // 全部使用合成样例名；真实私有样例名不得进入受跟踪文件。
+                        SourcePath = @"E:\图纸 目录\DWG_示例组件A1.prt",
+                        FinalOutputPath = @"E:\图纸 目录\DWG_示例组件A1.pdf",
+                        WorkerTempOutputPath = @"E:\图纸 目录\.DWG_示例组件A1.run-20260826-01.9f2c.tmp.pdf"
                     },
                     new JobItem
                     {

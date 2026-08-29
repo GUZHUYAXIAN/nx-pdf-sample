@@ -19,9 +19,13 @@ namespace NxDrawingPdfExporter.Core.Tests
             internal static string Normalize(string path) => path.TrimEnd('\\');
         }
 
-        private const string Drawing1 = @"E:\图纸库\PRIVATE_SAMPLE_A.prt";
+        // 合成样例名：真实私有样例名不得进入受跟踪文件。
+        private const string Drawing1 = @"E:\图纸库\DWG_示例组件A1.prt";
         private const string Drawing2 = @"E:\图纸库\plain model.prt";
         private const string MultiDot = @"E:\图纸库\多 点.号 图.prt";
+
+        private const string Drawing1Pdf = @"E:\图纸库\DWG_示例组件A1.pdf";
+        private const string Drawing1UnifiedPdf = @"E:\统一 输出\DWG_示例组件A1.pdf";
 
         [TestMethod]
         public void BesideSource_PreservesCompleteBasename_ReplacingOnlyLastExtension()
@@ -51,7 +55,7 @@ namespace NxDrawingPdfExporter.Core.Tests
                 ExistingPdfPolicy.Skip);
 
             CollectionAssert.AreEqual(
-                new[] { @"E:\统一 输出\PRIVATE_SAMPLE_A.pdf", @"E:\统一 输出\plain model.pdf" },
+                new[] { Drawing1UnifiedPdf, @"E:\统一 输出\plain model.pdf" },
                 plan.Select(p => p.FinalOutputPath).ToArray());
         }
 
@@ -59,7 +63,7 @@ namespace NxDrawingPdfExporter.Core.Tests
         public void SkipPolicy_MarksExistingTargetsAsSkipped()
         {
             var probe = new FakeExistingFiles();
-            probe.Existing.Add(@"E:\图纸库\PRIVATE_SAMPLE_A.pdf");
+            probe.Existing.Add(Drawing1Pdf);
             var planner = new OutputPlanner(probe);
 
             var plan = planner.Plan(
@@ -75,7 +79,7 @@ namespace NxDrawingPdfExporter.Core.Tests
         public void OverwritePolicy_KeepsExistingTargetsReady()
         {
             var probe = new FakeExistingFiles();
-            probe.Existing.Add(@"E:\图纸库\PRIVATE_SAMPLE_A.pdf");
+            probe.Existing.Add(Drawing1Pdf);
             var planner = new OutputPlanner(probe);
 
             var plan = planner.Plan(
