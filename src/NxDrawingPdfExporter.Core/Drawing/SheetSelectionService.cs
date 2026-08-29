@@ -60,11 +60,11 @@ namespace NxDrawingPdfExporter.Core.Drawing
 
                 if (sheet.DraftingViewCount >= 1)
                 {
-                    exportIndices.Add(sheet.NavigatorIndex);
+                    exportIndices.Add(sheet.ExportOrderIndex);
                 }
                 else
                 {
-                    skipIndices.Add(sheet.NavigatorIndex);
+                    skipIndices.Add(sheet.ExportOrderIndex);
                 }
             }
 

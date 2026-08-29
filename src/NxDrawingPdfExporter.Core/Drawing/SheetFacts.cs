@@ -2,7 +2,7 @@ namespace NxDrawingPdfExporter.Core.Drawing
 {
     public sealed class SheetFacts
     {
-        public int NavigatorIndex { get; set; }
+        public int ExportOrderIndex { get; set; }
 
         public string Name { get; set; } = "";
 

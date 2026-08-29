@@ -23,8 +23,8 @@ namespace NxDrawingPdfExporter.Core.Tests
         {
             var selection = new SheetSelectionService().Select(new[]
             {
-                new SheetFacts { NavigatorIndex = 0, Name = "模板页", DraftingViewCount = 0 },
-                new SheetFacts { NavigatorIndex = 1, Name = "标题栏页", DraftingViewCount = 0 }
+                new SheetFacts { ExportOrderIndex = 0, Name = "模板页", DraftingViewCount = 0 },
+                new SheetFacts { ExportOrderIndex = 1, Name = "标题栏页", DraftingViewCount = 0 }
             });
 
             Assert.AreEqual(SheetSelectionKind.NoValidSheets, selection.Kind);
@@ -32,13 +32,13 @@ namespace NxDrawingPdfExporter.Core.Tests
         }
 
         [TestMethod]
-        public void Select_DraftingViews_ExportsInNavigatorOrder()
+        public void Select_DraftingViews_RetainsPublicApiExportOrder()
         {
             var selection = new SheetSelectionService().Select(new[]
             {
-                new SheetFacts { NavigatorIndex = 8, Name = "第二页", DraftingViewCount = 1 },
-                new SheetFacts { NavigatorIndex = 3, Name = "模板页", DraftingViewCount = 0 },
-                new SheetFacts { NavigatorIndex = 1, Name = "第一页", DraftingViewCount = 2 }
+                new SheetFacts { ExportOrderIndex = 8, Name = "第二页", DraftingViewCount = 1 },
+                new SheetFacts { ExportOrderIndex = 3, Name = "模板页", DraftingViewCount = 0 },
+                new SheetFacts { ExportOrderIndex = 1, Name = "第一页", DraftingViewCount = 2 }
             });
 
             Assert.AreEqual(SheetSelectionKind.Exportable, selection.Kind);
@@ -51,7 +51,7 @@ namespace NxDrawingPdfExporter.Core.Tests
         {
             var selection = new SheetSelectionService().Select(new[]
             {
-                new SheetFacts { NavigatorIndex = 0, Name = "视图更新失败", DraftingViewCount = 0, InspectionFailure = "关联模型缺失" }
+                new SheetFacts { ExportOrderIndex = 0, Name = "视图更新失败", DraftingViewCount = 0, InspectionFailure = "关联模型缺失" }
             });
 
             Assert.AreEqual(SheetSelectionKind.Failed, selection.Kind);

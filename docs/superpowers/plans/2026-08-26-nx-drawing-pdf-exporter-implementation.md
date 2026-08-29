@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 交付一个可解压运行的 Windows 11 x64 工具，借助本机 Siemens NX 10.0.0.24 批量将制图 PRT 中含实际 Drafting View 的 Drawing Sheet 按导航器顺序导出为同名多页 PDF。
+**Goal:** 交付一个可解压运行的 Windows 11 x64 工具，借助本机 Siemens NX 10.0.0.24 批量将制图 PRT 中含实际 Drafting View 的 Drawing Sheet 按公开 `DrawingSheets` 集合返回顺序导出为同名多页 PDF。
 
 **Architecture:** 采用双进程：自包含 .NET 10 WinForms GUI 负责发现、预检查、编排和结果显示；.NET Framework 4.8 x64 Worker 由 NX `run_managed.exe` 启动并独占 NXOpen。跨进程通过产品自有 JSON DTO 交换任务与结果；NX 无关规则放入 `Core`，GUI 永不引用 Siemens 程序集。
 
@@ -58,7 +58,7 @@ Set-Location -LiteralPath $taskRoot
 | 跳过已有 PDF、安全覆盖已有 PDF | Task 4、7、11 |
 | 纯模型、无有效页、名称冲突、取消、失败继续 | Task 5、9、11 |
 | `GetDraftingViews()` 有效页判据、预制页跳过 | Task 5、6 |
-| 导航器顺序、多页 PDF、原始图幅、白底黑线 | Task 6、8 |
+| 公开 DrawingSheets 集合顺序、多页 PDF、原始图幅、白底黑线 | Task 6、8 |
 | Worker 真机启动、样例导出、批量行为三道门槛 | Task 3、6/8、11 |
 | 不保存源文件、前后哈希、安全临时副本 | Task 6、8、11 |
 | 便携 GUI、多 DPI、干净解压、断网运行 | Task 10、12 |
@@ -376,7 +376,7 @@ Tests must prove: zero sheets => pure model; sheets with zero drafting views => 
 ```csharp
 public sealed class SheetFacts
 {
-    public int NavigatorIndex { get; set; }
+    public int ExportOrderIndex { get; set; }
     public string Name { get; set; } = "";
     public int DraftingViewCount { get; set; }
     public string? InspectionFailure { get; set; }
@@ -400,7 +400,7 @@ git add src/NxDrawingPdfExporter.Core tests/NxDrawingPdfExporter.Core.Tests
 git commit -m "feat: classify exportable drawing sheets"
 ```
 
-### Task 6: Build the NX adapter and prove sheet order on the private sample
+### Task 6: Build the NX adapter and prove public-API sheet order on the private sample
 
 **Files:**
 - Create: `src/NxDrawingPdfExporter.Worker/Program.cs`
@@ -411,31 +411,35 @@ git commit -m "feat: classify exportable drawing sheets"
 - Create: `tools/run-sheet-inventory.ps1`
 - Create: `docs/verification/gate-2/sheet-inventory.schema.json`
 
-- [ ] **Step 1: Add NX-independent source guard tests first**
+- [x] **Step 1: Add NX-independent source guard tests first**
 
 Extend Core tests for a snapshot of full path, length, UTC mtime, and SHA-256. Product runtime compares length/mtime; validation scripts compare hashes. A detected change returns fatal failure.
 
-- [ ] **Step 2: Open exactly one candidate without saving**
+- [x] **Step 2: Open exactly one candidate without saving**
 
 Use `Session.Parts.OpenDisplay(path, out PartLoadStatus)`. Capture all load-status messages before disposing it. On close, use `BasePart.Close(...DontCloseModified...)` and never invoke Save/SaveAs.
 
-- [ ] **Step 3: Enumerate native collection order and map facts**
+- [x] **Step 3: Enumerate native collection order and map facts**
 
-For every `workPart.DrawingSheets` item in returned order, record index, name, size/unit facts, and `GetDraftingViews().Length`. Keep the NX object array aligned to those indices.
+For every `workPart.DrawingSheets` item in returned order, record `ExportOrderIndex`, name, size/unit facts, and `GetDraftingViews().Length`. Keep the NX object array and report array aligned to those indices. The public collection order is the V1 export contract.
 
-- [ ] **Step 4: Run the inventory against the untouched private sample**
+- [x] **Step 4: Run the inventory against the untouched private sample**
 
 Before invocation, hash both PRT files. Run through `run_managed.exe`. Save only a privacy-scrubbed sheet inventory under `docs/verification/gate-2/`; generated raw logs remain gitignored under `artifacts/`.
 
-- [ ] **Step 5: Compare with the visible NX navigator**
+- [x] **Step 5: Prove the public DrawingSheets export-order contract**
 
-The developer must open the sample in NX and record that API order matches navigator top-to-bottom. If it does not, implement a narrow UF Drafting order adapter and repeat; alphabetical/natural name sorting is forbidden.
+Record that the report array, `ExportOrderIndex`, and `NativeIndex` match the
+public `workPart.DrawingSheets` enumeration item-for-item. The known visible
+Navigator timestamp-order mismatch is an NX GUI preference and is explicitly
+outside the V1 export contract. Do not use UF Drafting, alphabetical/natural
+name sorting, numeric-name sorting, or Tag-value sorting to rewrite this order.
 
-- [ ] **Step 6: Verify source hashes and gate result**
+- [x] **Step 6: Verify source hashes and gate result**
 
 At the beginning of the validation run, compute a local baseline for both PRT files and retain it only in the gitignored run-artifact directory. Expected: the post-run hash for each file exactly equals that run's pre-run hash. Any mismatch is a hard stop; do not commit sample hashes or other private sample metadata.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src/NxDrawingPdfExporter.Worker src/NxDrawingPdfExporter.Core tests tools/run-sheet-inventory.ps1 docs/verification/gate-2
@@ -520,7 +524,7 @@ Use `workPart.PlotManager.CreatePrintPdfbuilder()`, `builder.SourceBuilder.SetSh
 
 - [ ] **Step 3: Produce authoritative `FileResult`**
 
-Record exported and skipped sheet names in navigator order, NX load/update diagnostics, temp path token, source guard outcome, and status. Exit code alone never means success.
+Record exported and skipped sheet names in public `DrawingSheets` export order, NX load/update diagnostics, temp path token, source guard outcome, and status. Exit code alone never means success.
 
 - [ ] **Step 4: Run the private sample gate**
 

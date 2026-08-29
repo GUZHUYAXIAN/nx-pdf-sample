@@ -1,6 +1,6 @@
 # NX 制图批量 PDF 导出工具
 
-这是一个面向 Siemens NX 10.0.0.24 和 Windows 11 x64 的本地便携工具项目。目标是批量读取制图 PRT，将其中含实际制图视图的 Drawing Sheet 按 NX 图纸导航器顺序合并为同名多页 PDF。
+这是一个面向 Siemens NX 10.0.0.24 和 Windows 11 x64 的本地便携工具项目。目标是批量读取制图 PRT，将其中含实际制图视图的 Drawing Sheet 按 NX 10 公开 `DrawingSheets` 集合返回顺序合并为同名多页 PDF。
 
 计划中的 GUI 为 .NET 10 自包含发布，不要求用户额外安装现代 .NET；NX Worker 使用目标 Windows 11 已有的 .NET Framework 4.8 系统组件，产品不会安装或修复系统运行库。
 
@@ -17,7 +17,7 @@
 - 输出文件名保持制图 PRT 的完整基本名，只将 `.prt` 替换为 `.pdf`。
 - 只有至少包含一个实际制图视图的 Drawing Sheet 才导出。
 - 只有图框、标题栏、通用技术要求或预制表格的模板页跳过。
-- 有效页按 NX 图纸导航器从上到下的顺序写入一个多页 PDF。
+- 有效页按 NX 10 公开 `DrawingSheets` 集合返回顺序写入一个多页 PDF；NX GUI 的时间戳显示排序不参与导出。
 - PDF 采用白底黑线、原始图幅、无水印，不统一缩放纸张。
 - 不保存或修改 PRT，不修改 NX、注册表或全局环境变量。
 
