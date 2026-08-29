@@ -12,9 +12,12 @@
 
 3. **Exportable-sheet rule.** A sheet exports only when
    `GetDraftingViews().Length >= 1`. Border/title-block/technical-requirement
-   template pages are skipped. A dedicated zero-valid-sheet PRT fixture could
-   not be authored without interactive NX; the rule is covered by unit tests
-   and by the live sample's eight zero-view sheets.
+   template pages are skipped. The file-level no-valid-sheet behavior is now
+   proven on real NX: Gate 3 scenario S11 (2026-08-30) uses a dedicated
+   synthetic PRT — one A4 sheet, zero drafting views, created by
+   `tools/NxDrawingPdfExporter.FixtureBuilder` — and the worker reports
+   `NoValidSheets` with no PDF and no temp leftovers, then continues to a
+   real successful export.
 
 4. **Missing dependencies fail the PRT.** Any unloaded component fails that
    PRT with NX's load diagnostics in the message; it is never exported with
@@ -28,9 +31,14 @@
 6. **DPI screenshots.** GUI visual QA was performed at the machine's current
    100% scaling only. 125%/150% screenshots require temporarily changing the
    system display scaling, which is a machine configuration change outside
-   the authorized boundaries. Mitigations in place: PerMonitorV2 manifest,
-   DPI-aware `AutoScaleMode`, layout via `TableLayoutPanel`/`AutoSize` with
-   no absolute coordinates.
+   the authorized boundaries. Mitigations in place: PerMonitorV2 manifest and
+   DPI-aware `AutoScaleMode`; group-level layout uses
+   `TableLayoutPanel`/`FlowLayoutPanel`/`AutoSize`. However, several inner
+   controls (text boxes, list views, buttons) still carry fixed pixel
+   `Left`/`Top`/`Width`/`Height` values, so clipping or overlap at higher
+   scaling factors — especially with Chinese text and long paths — is an
+   untested risk. Visual QA at 125%/150% is required before acceptance;
+   refactor to docking/anchored layouts only if that QA exposes defects.
 
 7. **Offline verification.** The machine's network was not disabled during
    QA (system configuration boundary). The offline claim rests on a source

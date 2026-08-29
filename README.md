@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-截至 2026-08-29，批准计划的 Task 1–12 已全部完成：三道真机门槛（Worker 启动、样例导出、批量行为矩阵）、事务性发布、便携 GUI、发布包检查与干净解压 QA 均通过，证据位于 `docs/verification/`（gate-1、gate-2、gate-3、release）。发布包在 `artifacts/release/package/`（Git 忽略），含 SHA-256 清单。已知限制见 `docs/verification/release/known-limitations.md`。
+**实现候选，验收暂缓**（2026-08-30）。批准计划的 Task 1–12 已实现，三道真机门槛与发布包曾在本分支验证通过（证据位于 `docs/verification/`）。2026-08-30 独立评审（SOL，见 `docs/handoffs/2026-08-30-sol-code-review-findings.md`）发现多项 P1 问题后，本轮已完成：运行状态隔离/结果所有权校验/发布期取消与致命错误处理（CR-01/02/03/05）、Worker 快照保留（CR-04）、覆盖后终验（CR-06）、发布包路径泄漏扫描与 UTF-8 清单（CR-07/08）、私有样例名移出受跟踪文件（CR-09）及 Gate 3 场景增强（EV-01/02/03）。**尚未关闭**：125%/150% DPI 截图（EV-04）与断网实机 QA（EV-05）需用户亲自执行；README/计划勾选的最终对账待二审通过后进行。在二审通过前，本分支不得视为验收完成。
 
 ## 使用方式
 

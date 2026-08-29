@@ -107,7 +107,11 @@ foreach ($file in $files) {
 
 # Developer-path audit across ALL payload bytes, in both ASCII and UTF-16LE
 # forms, so embedded PDB/CodeView data or string literals cannot hide a
-# developer checkout or NX installation path.
+# developer checkout or NX installation path. The exact verified NX install
+# root is an APPROVED runtime constant (fail-closed detection requires it,
+# see the approved design) and is whitelisted verbatim; any other
+# drive-qualified path under Program Files remains forbidden.
+$approvedConstants = @('D:\Program Files\Siemens\NX 10.0')
 $forbiddenLiterals = @('E:\Codex', 'D:\Program Files', 'nx-step-launcher')
 foreach ($file in $files) {
     $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
@@ -116,15 +120,20 @@ foreach ($file in $files) {
         [System.Text.Encoding]::Unicode.GetString($bytes)
     )
     foreach ($form in $forms) {
+        $scanned = $form
+        foreach ($approved in $approvedConstants) {
+            $scanned = $scanned.Replace($approved, '')
+        }
+
         $hit = $null
         foreach ($literal in $forbiddenLiterals) {
-            if ($form.IndexOf($literal, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            if ($scanned.IndexOf($literal, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
                 $hit = $literal
                 break
             }
         }
 
-        if ($null -eq $hit -and $form -match '[A-Za-z]:\\Users\\') {
+        if ($null -eq $hit -and $scanned -match '[A-Za-z]:\\Users\\') {
             $hit = '用户目录绝对路径'
         }
 
