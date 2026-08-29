@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using NxDrawingPdfExporter.Contracts;
 using NxDrawingPdfExporter.Core.Drawing;
 using NXOpen;
 using NXOpen.Drawings;
@@ -75,12 +76,12 @@ namespace NxDrawingPdfExporter.Worker
 
                 if (selection.Kind == SheetSelectionKind.PureModel)
                 {
-                    return ExportReport.Failed("纯模型部件，没有图纸页。");
+                    return ExportReport.Failed("纯模型部件，没有图纸页。", FileResultStatus.PureModel);
                 }
 
                 if (selection.Kind == SheetSelectionKind.NoValidSheets)
                 {
-                    return ExportReport.Failed("没有包含实际制图视图的图纸页。");
+                    return ExportReport.Failed("没有包含实际制图视图的图纸页。", FileResultStatus.NoValidSheets);
                 }
 
                 var selectedSheets = selection.ExportIndices.Select(i => nativeSheets[i]).ToArray();
@@ -109,6 +110,7 @@ namespace NxDrawingPdfExporter.Worker
                 return new ExportReport
                 {
                     Success = true,
+                    Outcome = FileResultStatus.Success,
                     LoadDiagnostics = loadDiagnostics,
                     Sheets = reportItems.ToArray(),
                     SelectedCount = selectedSheets.Length,

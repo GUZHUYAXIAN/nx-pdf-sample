@@ -2,7 +2,9 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization.Json;
+using NxDrawingPdfExporter.Contracts;
 using NxDrawingPdfExporter.Core.Drawing;
+using NxDrawingPdfExporter.Core.Jobs;
 
 namespace NxDrawingPdfExporter.Worker
 {
@@ -15,7 +17,7 @@ namespace NxDrawingPdfExporter.Worker
 
         public static int Main(string[] args)
         {
-            if (args == null || args.Length < 3)
+            if (args == null || args.Length < 2)
             {
                 PrintUsage();
                 return UsageError;
@@ -31,6 +33,11 @@ namespace NxDrawingPdfExporter.Worker
                 return RunExport(args[1], Path.GetFullPath(args[2]), Path.GetFullPath(args[3]));
             }
 
+            if (string.Equals(args[0], "--run-job", StringComparison.Ordinal) && args.Length == 2)
+            {
+                return RunJob(Path.GetFullPath(args[1]));
+            }
+
             PrintUsage();
             return UsageError;
         }
@@ -39,6 +46,54 @@ namespace NxDrawingPdfExporter.Worker
         {
             Console.Error.WriteLine("用法: NxDrawingPdfExporter.Worker.exe --inventory <drawing-prt> <report-json>");
             Console.Error.WriteLine("      NxDrawingPdfExporter.Worker.exe --export <drawing-prt> <temp-pdf> <report-json>");
+            Console.Error.WriteLine("      NxDrawingPdfExporter.Worker.exe --run-job <job-json>");
+        }
+
+        private static int RunJob(string jobPath)
+        {
+            JobRequest request;
+            try
+            {
+                request = JobJsonSerializer.ReadFromFile<JobRequest>(jobPath);
+            }
+            catch (Exception error)
+            {
+                Console.Error.WriteLine("任务文件读取失败: " + Sanitize(error.Message));
+                return UsageError;
+            }
+
+            JobResult result;
+            try
+            {
+                result = new NxBatchRunner().Run(request);
+            }
+            catch (Exception error)
+            {
+                Console.Error.WriteLine(error.ToString());
+                result = new JobResult
+                {
+                    RunId = request.RunId,
+                    StartedUtc = DateTime.UtcNow,
+                    EndedUtc = DateTime.UtcNow,
+                    FatalError = Sanitize(error.Message)
+                };
+            }
+
+            try
+            {
+                JobJsonSerializer.WriteToFile(result, request.ResultPath);
+            }
+            catch (Exception error)
+            {
+                Console.Error.WriteLine("结果写入失败: " + Sanitize(error.Message));
+                return ReportWriteFailure;
+            }
+
+            var summary = ResultSummary.From(result.Files);
+            Console.WriteLine(summary.ToChineseSummary());
+            return result.Files.Any(f => f.Status == FileResultStatus.Failed) || result.FatalError != null
+                ? ExportFailure
+                : 0;
         }
 
         private static int RunInventory(string sourcePath, string reportPath)

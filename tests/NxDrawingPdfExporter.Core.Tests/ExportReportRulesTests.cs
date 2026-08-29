@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NxDrawingPdfExporter.Contracts;
 using NxDrawingPdfExporter.Core.Drawing;
 
 namespace NxDrawingPdfExporter.Core.Tests
@@ -167,6 +168,36 @@ namespace NxDrawingPdfExporter.Core.Tests
             Assert.IsNotEmpty(issues);
         }
 
+        [TestMethod]
+        public void Validate_FailedReportWithSuccessOutcome_ReportsIssue()
+        {
+            var report = ExportReport.Failed("制图视图更新失败。");
+            report.Outcome = FileResultStatus.Success;
+
+            var issues = ExportReportRules.Validate(report);
+
+            Assert.IsNotEmpty(issues);
+        }
+
+        [TestMethod]
+        public void Validate_SuccessfulReportWithNonSuccessOutcome_ReportsIssue()
+        {
+            var report = BuildValidReport(1);
+            report.Outcome = FileResultStatus.NoValidSheets;
+
+            var issues = ExportReportRules.Validate(report);
+
+            Assert.IsNotEmpty(issues);
+        }
+
+        [TestMethod]
+        public void Validate_FailedReportWithPureModelOutcome_HasNoIssues()
+        {
+            var issues = ExportReportRules.Validate(ExportReport.Failed("纯模型部件，没有图纸页。", FileResultStatus.PureModel));
+
+            Assert.IsEmpty(issues);
+        }
+
         /// <summary>构造 selectedCount 张有效页 + 其余为模板页的规则有效报告。</summary>
         private static ExportReport BuildValidReport(int totalSheets, int? selectedCount = null)
         {
@@ -191,6 +222,7 @@ namespace NxDrawingPdfExporter.Core.Tests
             return new ExportReport
             {
                 Success = true,
+                Outcome = FileResultStatus.Success,
                 LoadDiagnostics = Array.Empty<string>(),
                 Sheets = sheets.ToArray(),
                 SelectedCount = selected,

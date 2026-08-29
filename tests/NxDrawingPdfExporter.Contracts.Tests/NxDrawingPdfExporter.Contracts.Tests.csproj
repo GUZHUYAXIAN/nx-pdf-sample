@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\NxDrawingPdfExporter.Contracts\NxDrawingPdfExporter.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\NxDrawingPdfExporter.Core\NxDrawingPdfExporter.Core.csproj" />
   </ItemGroup>
 
 </Project>

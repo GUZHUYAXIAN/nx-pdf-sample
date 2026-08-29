@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using NxDrawingPdfExporter.Contracts;
 
 namespace NxDrawingPdfExporter.Core.Drawing
 {
@@ -20,14 +21,27 @@ namespace NxDrawingPdfExporter.Core.Drawing
                 return new[] { "报告对象为空。" };
             }
 
+            var issues = new List<string>();
             if (!report.Success)
             {
-                return string.IsNullOrWhiteSpace(report.Failure)
-                    ? new[] { "失败报告缺少原因。" }
-                    : Array.Empty<string>();
+                if (string.IsNullOrWhiteSpace(report.Failure))
+                {
+                    issues.Add("失败报告缺少原因。");
+                }
+
+                if (report.Outcome is FileResultStatus.Success or FileResultStatus.Overwritten)
+                {
+                    issues.Add("失败报告的结果状态无效。");
+                }
+
+                return issues;
             }
 
-            var issues = new List<string>();
+            if (report.Outcome != FileResultStatus.Success)
+            {
+                issues.Add("成功报告的结果状态必须是 Success。");
+            }
+
             if (!string.IsNullOrWhiteSpace(report.Failure))
             {
                 issues.Add("成功报告不应携带失败原因。");

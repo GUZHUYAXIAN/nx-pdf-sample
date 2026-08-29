@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.Serialization;
+using NxDrawingPdfExporter.Contracts;
 
 namespace NxDrawingPdfExporter.Core.Drawing
 {
@@ -14,6 +15,12 @@ namespace NxDrawingPdfExporter.Core.Drawing
 
         [DataMember(Order = 2)]
         public string? Failure { get; set; }
+
+        // Mapped batch outcome. Success for an exported temp PDF; PureModel,
+        // NoValidSheets, or Failed otherwise. Never a GUI publication status
+        // like Overwritten, which only the validating side can decide.
+        [DataMember(Order = 9)]
+        public FileResultStatus Outcome { get; set; } = FileResultStatus.Failed;
 
         [DataMember(Order = 3)]
         public string[] LoadDiagnostics { get; set; } = Array.Empty<string>();
@@ -33,9 +40,9 @@ namespace NxDrawingPdfExporter.Core.Drawing
         [DataMember(Order = 8)]
         public long ElapsedMilliseconds { get; set; }
 
-        public static ExportReport Failed(string failure)
+        public static ExportReport Failed(string failure, FileResultStatus outcome = FileResultStatus.Failed)
         {
-            return new ExportReport { Success = false, Failure = failure };
+            return new ExportReport { Success = false, Failure = failure, Outcome = outcome };
         }
     }
 
