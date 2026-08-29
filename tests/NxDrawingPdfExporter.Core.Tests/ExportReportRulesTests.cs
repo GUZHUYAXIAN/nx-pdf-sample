@@ -198,6 +198,18 @@ namespace NxDrawingPdfExporter.Core.Tests
             Assert.IsEmpty(issues);
         }
 
+        [TestMethod]
+        public void Validate_SuccessfulReportWithLoadDiagnostics_ReportsIssue()
+        {
+            // 缺失依赖或加载失败的 PRT 必须失败，不得带病导出成功。
+            var report = BuildValidReport(1);
+            report.LoadDiagnostics = new[] { "组件未加载。" };
+
+            var issues = ExportReportRules.Validate(report);
+
+            Assert.IsNotEmpty(issues);
+        }
+
         /// <summary>构造 selectedCount 张有效页 + 其余为模板页的规则有效报告。</summary>
         private static ExportReport BuildValidReport(int totalSheets, int? selectedCount = null)
         {

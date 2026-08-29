@@ -51,6 +51,11 @@ namespace NxDrawingPdfExporter.Core.Drawing
             {
                 issues.Add("缺少加载诊断数组。");
             }
+            else if (report.LoadDiagnostics.Length > 0)
+            {
+                // 缺失依赖或加载失败必须使该 PRT 失败，不允许带病导出。
+                issues.Add("成功报告不得携带加载诊断。");
+            }
 
             if (report.Sheets == null)
             {

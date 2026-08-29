@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Gate 3 driver (validation-only, not product): runs the real ApplicationController
+    (real worker launch, real NX export, real managed PDF validation and
+    transactional publication) headlessly against disposable fixtures.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>NxDrawingPdfExporter.Gate3Driver</RootNamespace>
+    <AssemblyName>NxDrawingPdfExporter.Gate3Driver</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NxDrawingPdfExporter.App\NxDrawingPdfExporter.App.csproj" />
+  </ItemGroup>
+
+</Project>

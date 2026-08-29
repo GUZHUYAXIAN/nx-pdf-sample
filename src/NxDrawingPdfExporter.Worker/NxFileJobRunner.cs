@@ -38,6 +38,13 @@ namespace NxDrawingPdfExporter.Worker
                 }
 
                 var loadDiagnostics = CaptureLoadDiagnostics(loadStatus);
+                if (loadDiagnostics.Length > 0)
+                {
+                    // 缺失模型依赖：按批准设计该 PRT 失败，不得当作空白页或模板页。
+                    return ExportReport.Failed(
+                        "模型依赖未完全加载，已按失败处理: " + string.Join(" ", loadDiagnostics),
+                        FileResultStatus.Failed);
+                }
                 var salt = SheetNameTokenizer.NewSalt();
                 var nativeSheets = new List<DrawingSheet>();
                 foreach (DrawingSheet sheet in workPart.DrawingSheets)
