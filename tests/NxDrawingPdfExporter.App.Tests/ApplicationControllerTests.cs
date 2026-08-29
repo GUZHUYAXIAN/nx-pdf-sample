@@ -40,7 +40,7 @@ namespace NxDrawingPdfExporter.App.Tests
             }
         }
 
-        private ApplicationServices NewServices()
+        private ApplicationServices NewServices(IPdfInspector? inspector = null)
         {
             var workerExe = Path.Combine(scratch, "worker.exe");
             File.WriteAllText(workerExe, "worker");
@@ -49,7 +49,7 @@ namespace NxDrawingPdfExporter.App.Tests
                 WorkerLauncher = launcher,
                 RunRootProvider = () => Path.Combine(scratch, "runs"),
                 WorkerExePath = workerExe,
-                PdfInspector = new StubInspector(pageCount: 1)
+                PdfInspector = inspector ?? new StubInspector(pageCount: 1)
             };
         }
 
@@ -286,6 +286,157 @@ namespace NxDrawingPdfExporter.App.Tests
         }
 
         [TestMethod]
+        public async Task Run_SecondRunFailsBeforeLaunch_DoesNotRetainFirstRunSuccessState()
+        {
+            var services = NewServices();
+            var controller = NewController(services);
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            await controller.RunAsync();
+            Assert.HasCount(2, controller.Results);
+            Assert.IsNotNull(controller.Summary);
+            Assert.IsNotNull(controller.CurrentRunDirectory);
+
+            services.NxDetectionOverride = () => Detection(supported: false);
+            await controller.RunAsync();
+
+            Assert.HasCount(0, controller.Results);
+            Assert.IsNull(controller.Summary);
+            Assert.IsNull(controller.CurrentRunDirectory);
+            Assert.IsFalse(controller.IsBusy);
+            StringAssert.Contains(controller.ProgressText, "NX");
+        }
+
+        [TestMethod]
+        public async Task Run_SecondRunInvalidResultJson_KeepsOnlyCurrentRunState()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            await controller.RunAsync();
+            var firstRunDirectory = controller.CurrentRunDirectory!;
+            Assert.HasCount(2, controller.Results);
+            // 第二轮不能因“目标已存在”走跳过路径；清掉首轮产物使其真正进入 Worker。
+            foreach (var produced in Directory.GetFiles(Path.Combine(scratch, "in"), "*.pdf"))
+            {
+                File.Delete(produced);
+            }
+
+            launcher.WriteInvalidResultJson = true;
+            await controller.RunAsync();
+
+            Assert.HasCount(0, controller.Results);
+            Assert.IsNull(controller.Summary);
+            Assert.IsNotNull(controller.CurrentRunDirectory);
+            Assert.AreNotEqual(firstRunDirectory, controller.CurrentRunDirectory);
+            StringAssert.Contains(controller.ProgressText, "结果文件");
+        }
+
+        [TestMethod]
+        public async Task Run_AllTargetsExistWithSkipPolicy_NeverLaunchesWorkerOrCreatesRunDirectory()
+        {
+            File.WriteAllText(Path.Combine(scratch, "in", "drawing1.pdf"), "existing-1");
+            File.WriteAllText(Path.Combine(scratch, "in", "drawing2.pdf"), "existing-2");
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+
+            await controller.RunAsync();
+
+            Assert.HasCount(2, controller.Results);
+            Assert.IsTrue(controller.Results.All(r => r.Status == FileResultStatus.SkippedExisting));
+            Assert.IsEmpty(launcher.LaunchCalls);
+            Assert.IsNull(controller.CurrentRunDirectory);
+            Assert.IsFalse(Directory.Exists(Path.Combine(scratch, "runs")));
+            Assert.AreEqual("existing-1", File.ReadAllText(Path.Combine(scratch, "in", "drawing1.pdf")));
+            Assert.AreEqual("existing-2", File.ReadAllText(Path.Combine(scratch, "in", "drawing2.pdf")));
+            StringAssert.Contains(controller.SummaryText, "已有跳过 2");
+        }
+
+        [TestMethod]
+        public async Task Cancel_DuringPublication_PublishesCurrentFileThenCancelsRest()
+        {
+            var firstInspectStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var services = NewServices(new StubInspector(pageCount: 1)
+            {
+                OnInspect = () =>
+                {
+                    firstInspectStarted.TrySetResult(true);
+                    releaseGate.Task.Wait(15000);
+                }
+            });
+            var controller = NewController(services);
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            var run = controller.RunAsync();
+
+            Assert.IsTrue(firstInspectStarted.Task.Wait(15000), "第一个文件的发布校验未开始。");
+            controller.Cancel();
+            Assert.IsTrue(releaseGate.TrySetResult(true));
+            await run;
+
+            Assert.AreEqual(FileResultStatus.Success, controller.Results[0].Status);
+            Assert.IsTrue(File.Exists(Path.Combine(scratch, "in", "drawing1.pdf")));
+            Assert.AreEqual(FileResultStatus.Cancelled, controller.Results[1].Status);
+            Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing2.pdf")));
+            Assert.IsEmpty(Directory.GetFiles(Path.Combine(scratch, "in"), "*.tmp.pdf"));
+            Assert.AreEqual(1, controller.Summary!.Cancelled);
+            Assert.IsFalse(controller.IsBusy);
+            StringAssert.Contains(controller.ProgressText, "取消");
+        }
+
+        [TestMethod]
+        public async Task Run_ResultFromDifferentRunId_AllItemsFailWithoutPublication()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            launcher.ResultRunIdOverride = "run-from-another-life";
+
+            await controller.RunAsync();
+
+            Assert.HasCount(2, controller.Results);
+            Assert.IsTrue(controller.Results.All(r => r.Status == FileResultStatus.Failed));
+            Assert.IsTrue(controller.Summary!.HasFailures);
+            StringAssert.Contains(controller.ProgressText, "不匹配");
+            Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing1.pdf")));
+            Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing2.pdf")));
+        }
+
+        [TestMethod]
+        public async Task Run_FatalErrorWithNoFileResults_AllItemsFailWithoutPublication()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            launcher.ResultFatalError = "批处理运行期间发生致命错误（模拟）";
+            launcher.ResultFileCountLimit = 0;
+
+            await controller.RunAsync();
+
+            Assert.HasCount(2, controller.Results);
+            Assert.IsTrue(controller.Results.All(r => r.Status == FileResultStatus.Failed));
+            Assert.IsTrue(controller.Summary!.HasFailures);
+            StringAssert.Contains(controller.ProgressText, "致命");
+            Assert.IsEmpty(Directory.GetFiles(Path.Combine(scratch, "in"), "*.pdf"));
+        }
+
+        [TestMethod]
+        public async Task Run_FatalErrorAfterOneSuccess_PublishesOnlyTheTrustedPrefix()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            launcher.ResultFatalError = "批处理在后续文件上发生致命错误（模拟）";
+            launcher.ResultFileCountLimit = 1;
+
+            await controller.RunAsync();
+
+            Assert.AreEqual(FileResultStatus.Success, controller.Results[0].Status);
+            Assert.IsTrue(File.Exists(Path.Combine(scratch, "in", "drawing1.pdf")));
+            Assert.AreEqual(FileResultStatus.Failed, controller.Results[1].Status);
+            StringAssert.Contains(controller.Results[1].Message, "致命");
+            Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing2.pdf")));
+            Assert.IsEmpty(Directory.GetFiles(Path.Combine(scratch, "in"), "*.tmp.pdf"));
+            StringAssert.Contains(controller.ProgressText, "致命");
+            Assert.IsTrue(controller.Summary!.HasFailures);
+        }
+
+        [TestMethod]
         public void ProgressAndEvents_StateChangeRaisedAroundRun()
         {
             var controller = NewController();
@@ -312,10 +463,14 @@ namespace NxDrawingPdfExporter.App.Tests
         {
             private readonly int pageCount;
 
+            /// <summary>发布校验回调：用于在发布进行中注入取消请求等测试时序。</summary>
+            public Action? OnInspect { get; set; }
+
             public StubInspector(int pageCount) => this.pageCount = pageCount;
 
             public PdfInspection Inspect(string path)
             {
+                OnInspect?.Invoke();
                 var length = new FileInfo(path).Length;
                 var header = ReadHeader(path);
                 return new PdfInspection
@@ -352,6 +507,18 @@ namespace NxDrawingPdfExporter.App.Tests
             public FileResultStatus? ReportStatusForAll { get; set; }
             public bool WriteGarbageTempPdfs { get; set; }
 
+            /// <summary>模拟 Worker 写出损坏的 result.json（结果不可读）。</summary>
+            public bool WriteInvalidResultJson { get; set; }
+
+            /// <summary>模拟 Worker 写出属于其他运行的结果文件。</summary>
+            public string? ResultRunIdOverride { get; set; }
+
+            /// <summary>模拟批级致命错误：结果携带 FatalError。</summary>
+            public string? ResultFatalError { get; set; }
+
+            /// <summary>模拟 Worker 只完成前 N 个文件后崩溃（其余条目无结果、无临时 PDF）。</summary>
+            public int? ResultFileCountLimit { get; set; }
+
             /// <summary>模拟真实 Worker 的启动耗时；仅取消/进度类测试需要。</summary>
             public bool HoldUntilReleased { get; set; }
 
@@ -360,6 +527,7 @@ namespace NxDrawingPdfExporter.App.Tests
                 LaunchCalls.Add(request);
                 var job = JobJsonSerializer.ReadFromFile<JobRequest>(request.JobPath);
                 var files = new List<FileResult>();
+                var reported = 0;
                 foreach (var item in job.Items)
                 {
                     // 与真实 Worker 的状态机一致：Skip 策略下已存在的目标
@@ -400,26 +568,42 @@ namespace NxDrawingPdfExporter.App.Tests
                         continue;
                     }
 
-                    if (WriteGarbageTempPdfs)
+                    var includeThisResult = ResultFileCountLimit is null || reported < ResultFileCountLimit.Value;
+                    if (includeThisResult)
                     {
-                        File.WriteAllText(item.WorkerTempOutputPath, "not a pdf");
-                    }
-                    else
-                    {
-                        File.WriteAllBytes(item.WorkerTempOutputPath, TestPdfFactory.CreateSinglePage());
+                        reported++;
+                        if (WriteGarbageTempPdfs)
+                        {
+                            File.WriteAllText(item.WorkerTempOutputPath, "not a pdf");
+                        }
+                        else
+                        {
+                            File.WriteAllBytes(item.WorkerTempOutputPath, TestPdfFactory.CreateSinglePage());
+                        }
+
+                        files.Add(WorkerSuccess(item, new[] { "sheet-token" }));
                     }
 
-                    files.Add(WorkerSuccess(item, new[] { "sheet-token" }));
+                    // 超出完成限额的条目：Worker 已崩溃，无结果也无临时文件。
                 }
 
                 var result = new JobResult
                 {
-                    RunId = job.RunId,
+                    RunId = ResultRunIdOverride ?? job.RunId,
                     StartedUtc = DateTime.UtcNow,
                     EndedUtc = DateTime.UtcNow,
-                    Files = files.ToArray()
+                    Files = files.ToArray(),
+                    FatalError = ResultFatalError
                 };
-                JobJsonSerializer.WriteToFile(result, job.ResultPath);
+                if (WriteInvalidResultJson)
+                {
+                    File.WriteAllText(job.ResultPath, "{ 这不是合法的 JSON");
+                }
+                else
+                {
+                    JobJsonSerializer.WriteToFile(result, job.ResultPath);
+                }
+
                 if (HoldUntilReleased)
                 {
                     WaitGate.Task.Wait(10000);

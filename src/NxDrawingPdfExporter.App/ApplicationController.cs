@@ -126,6 +126,12 @@ namespace NxDrawingPdfExporter.App
             }
 
             IsBusy = true;
+            // 每次新运行从干净状态开始：上一次运行的结果、汇总、进度与
+            // 运行目录不得在本次运行失败时残留在界面上。
+            Results = Array.Empty<FileResult>();
+            Summary = null;
+            ProgressText = "正在准备运行…";
+            CurrentRunDirectory = null;
             Raise();
             try
             {
@@ -191,6 +197,25 @@ namespace NxDrawingPdfExporter.App
                 return;
             }
 
+            var readyItems = plan.Where(p => p.Status == OutputPlanStatus.Ready).ToArray();
+
+            // 全部目标 PDF 已存在且策略为跳过：不需要 NX，也不启动 Worker，
+            // 更不创建运行目录——直接给出完整的跳过结果。
+            if (readyItems.Length == 0)
+            {
+                Results = plan.Select(p => new FileResult
+                {
+                    SourcePath = p.SourcePath,
+                    FinalOutputPath = p.FinalOutputPath,
+                    Status = FileResultStatus.SkippedExisting,
+                    Message = "已存在，已跳过。"
+                }).ToArray();
+                Summary = ResultSummary.From(Results);
+                ProgressText = "全部目标 PDF 已存在，按跳过策略无需导出。";
+                log.Write(ProgressText);
+                return;
+            }
+
             var workerExePath = services.WorkerExePath
                 ?? Path.Combine(AppContext.BaseDirectory, "worker", "NxDrawingPdfExporter.Worker.exe");
             if (!File.Exists(workerExePath))
@@ -209,7 +234,7 @@ namespace NxDrawingPdfExporter.App
             var runLog = new RunLog(runDirectory);
 
             var jobItems = new List<JobItem>();
-            foreach (var item in plan.Where(p => p.Status == OutputPlanStatus.Ready))
+            foreach (var item in readyItems)
             {
                 var tempName = "." + Path.GetFileName(item.FinalOutputPath) + "." + runId + "." + Guid.NewGuid().ToString("N").Substring(0, 8) + ".tmp.pdf";
                 jobItems.Add(new JobItem
@@ -275,13 +300,32 @@ namespace NxDrawingPdfExporter.App
                 return;
             }
 
+            // 结果级校验：结果文件必须属于本次运行，否则整体拒绝发布。
+            if (!string.Equals(result.RunId, runId, StringComparison.Ordinal))
+            {
+                runLog.Write("Worker 结果文件的 RunId 与本次运行不符，拒绝发布任何文件。");
+                Results = readyItems.Select(item => new FileResult
+                {
+                    SourcePath = item.SourcePath,
+                    FinalOutputPath = item.FinalOutputPath,
+                    Status = FileResultStatus.Failed,
+                    Message = "Worker 结果文件与本次运行不匹配，不能作为成功依据。"
+                }).ToArray();
+                Summary = ResultSummary.From(Results);
+                ProgressText = "Worker 结果文件与本次运行不匹配，已拒绝发布。";
+                return;
+            }
+
             // 逐文件验证并事务性发布；只有通过校验的临时 PDF 才会成为正式输出。
             // 跳过项来自预检查，从未进入 Worker 任务。
+            // 取消请求在两个发布操作之间生效：当前发布原子完成，其余不再发布。
             var publisher = new SafeOutputPublisher(services.PdfInspector, services.FileReplacer);
             var workerResults = result.Files
                 .GroupBy(f => f.SourcePath, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+            var fatal = result.FatalError;
             var finalResults = new List<FileResult>(plan.Count);
+            var cancellationRequested = false;
             for (var index = 0; index < plan.Count; index++)
             {
                 var planItem = plan[index];
@@ -297,16 +341,40 @@ namespace NxDrawingPdfExporter.App
                     continue;
                 }
 
+                if (!cancellationRequested && IsCancellationRequested())
+                {
+                    cancellationRequested = true;
+                    runLog.Write("发布阶段检测到取消请求：完成当前文件后不再发布后续文件。");
+                    ProgressText = "已请求取消，将在当前文件发布完成后停止。";
+                    Raise();
+                }
+
+                if (cancellationRequested)
+                {
+                    DeleteRunOwnedTemp(request, planItem.SourcePath, runLog);
+                    finalResults.Add(new FileResult
+                    {
+                        SourcePath = planItem.SourcePath,
+                        FinalOutputPath = planItem.FinalOutputPath,
+                        Status = FileResultStatus.Cancelled,
+                        Message = "已请求取消，该文件未被发布。"
+                    });
+                    continue;
+                }
+
                 ProgressText = $"正在验证并发布 {finalResults.Count + 1}/{plan.Count}…";
                 Raise();
                 if (!workerResults.TryGetValue(planItem.SourcePath, out var workerResult))
                 {
+                    DeleteRunOwnedTemp(request, planItem.SourcePath, runLog);
                     finalResults.Add(new FileResult
                     {
                         SourcePath = planItem.SourcePath,
                         FinalOutputPath = planItem.FinalOutputPath,
                         Status = FileResultStatus.Failed,
-                        Message = "Worker 未报告该文件的结果。"
+                        Message = fatal is null
+                            ? "Worker 未报告该文件的结果。"
+                            : "批处理在完成该文件前发生致命错误: " + fatal
                     });
                     continue;
                 }
@@ -316,8 +384,47 @@ namespace NxDrawingPdfExporter.App
 
             Results = finalResults;
             Summary = ResultSummary.From(finalResults);
-            ProgressText = "运行完成。";
+            if (fatal is not null)
+            {
+                runLog.Write("批处理致命错误: " + fatal);
+                ProgressText = "批处理发生致命错误: " + fatal;
+            }
+            else if (cancellationRequested)
+            {
+                ProgressText = "已取消：已在文件边界停止发布。";
+            }
+            else
+            {
+                ProgressText = "运行完成。";
+            }
+
             runLog.Write(Summary.ToChineseSummary());
+        }
+
+        /// <summary>取消标志是否已被置位（GUI 写入，Worker 与发布阶段都会观察）。</summary>
+        private bool IsCancellationRequested()
+        {
+            var path = cancellationFlagPath;
+            return path is not null && File.Exists(path);
+        }
+
+        /// <summary>删除本次运行自有的临时 PDF；未发布或未报告的条目不得残留临时文件。</summary>
+        private void DeleteRunOwnedTemp(JobRequest request, string sourcePath, RunLog runLog)
+        {
+            var item = request.Items.FirstOrDefault(i => string.Equals(i.SourcePath, sourcePath, StringComparison.OrdinalIgnoreCase));
+            if (item is null || !File.Exists(item.WorkerTempOutputPath))
+            {
+                return;
+            }
+
+            try
+            {
+                services.FileReplacer.DeleteFile(item.WorkerTempOutputPath);
+            }
+            catch (Exception error)
+            {
+                runLog.Write("清理运行临时 PDF 失败: " + SingleLine(error.Message));
+            }
         }
 
         private FileResult PublishOne(JobRequest request, FileResult fileResult, SafeOutputPublisher publisher, RunLog runLog)
