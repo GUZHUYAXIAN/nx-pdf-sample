@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-截至 2026-08-29，实施计划的 Task 1–10 已按批准计划完成并通过真机门槛（Worker 启动、样例导出、批量行为矩阵见 `docs/verification/`）。Task 11–12 的门禁与发布验证证据同样位于 `docs/verification/`。开发者只能按批准的计划执行，并不得越过真机门槛。
+截至 2026-08-29，批准计划的 Task 1–12 已全部完成：三道真机门槛（Worker 启动、样例导出、批量行为矩阵）、事务性发布、便携 GUI、发布包检查与干净解压 QA 均通过，证据位于 `docs/verification/`（gate-1、gate-2、gate-3、release）。发布包在 `artifacts/release/package/`（Git 忽略），含 SHA-256 清单。已知限制见 `docs/verification/release/known-limitations.md`。
 
 ## 使用方式
 
@@ -14,6 +14,7 @@
 - 工具仅支持 Windows 11 x64 与本机已安装的 Siemens NX 10.0.0.24；检测不到该精确版本时会拒绝运行。
 - Worker 通过 NX 自带的 `UGII\run_managed.exe` 启动，逐个处理 PRT，绝不并行。
 - 导出的 PDF 先写入临时文件，经托管 PDF 校验（页数、文件头、尺寸）后才原子发布；覆盖时保留旧文件直到新文件通过校验。
+- 重新发布：`powershell -NoProfile -File tools\publish-portable.ps1`，随后 `tools\inspect-release.ps1` 检查违禁内容并输出 SHA-256 清单。全程离线，不下载任何依赖。
 
 ## 已批准的核心行为
 
