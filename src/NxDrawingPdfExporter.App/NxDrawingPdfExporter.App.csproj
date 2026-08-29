@@ -1,18 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Portable WinForms GUI boundary (Task 1: empty class library so the solution
-    graph and App tests restore/build before Gate 1 passes; Task 10 flips this
-    to a WinExe with real forms). Must never reference NXOpen.
-    References PDFsharp for managed read-only PDF inspection (MIT, see
-    THIRD-PARTY-NOTICES.txt).
+    Portable WinForms GUI. Never references NXOpen; NX access is delegated to
+    the separate Worker process. References PDFsharp for managed read-only PDF
+    inspection (MIT, see THIRD-PARTY-NOTICES.txt).
   -->
 
   <PropertyGroup>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <RootNamespace>NxDrawingPdfExporter.App</RootNamespace>
     <AssemblyName>NxDrawingPdfExporter.App</AssemblyName>
     <PlatformTarget>x64</PlatformTarget>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
