@@ -1,0 +1,44 @@
+<Project>
+
+  <!--
+    Deterministic offline product build defaults.
+    No global TargetFramework is set here: each project declares its own
+    (netstandard2.0 / net48 / net10.0 / net10.0-windows) by design.
+  -->
+
+  <PropertyGroup>
+    <!-- Frozen public version; future incompatible work starts in a new major version. -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latestMajor</LangVersion>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors></WarningsNotAsErrors>
+    <!--
+      Path-neutrality for release payloads: rewrite the developer checkout
+      root in compiled symbol/metadata paths so packaged binaries never
+      embed the local absolute path.
+    -->
+    <PathMap>$(MSBuildThisFileDirectory)=/nxpdf/</PathMap>
+  </PropertyGroup>
+
+  <!--
+    Release builds ship without symbol files: the product reports sanitized
+    single-line errors only, and unshipped PDBs would still leave absolute
+    obj/bin paths inside the CodeView entries of distributed binaries.
+    Debug builds keep portable PDBs for normal development.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <!-- The product runs fully offline; vulnerability audit data would require network access. -->
+  <PropertyGroup>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+
+</Project>

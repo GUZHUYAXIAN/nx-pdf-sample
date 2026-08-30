@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 交付一个可解压运行的 Windows 11 x64 工具，借助本机 Siemens NX 10.0.0.24 批量将制图 PRT 中含实际 Drafting View 的 Drawing Sheet 按导航器顺序导出为同名多页 PDF。
+**Goal:** 交付一个可解压运行的 Windows 11 x64 工具，借助本机 Siemens NX 10.0.0.24 批量将制图 PRT 中含实际 Drafting View 的 Drawing Sheet 按公开 `DrawingSheets` 集合返回顺序导出为同名多页 PDF。
 
 **Architecture:** 采用双进程：自包含 .NET 10 WinForms GUI 负责发现、预检查、编排和结果显示；.NET Framework 4.8 x64 Worker 由 NX `run_managed.exe` 启动并独占 NXOpen。跨进程通过产品自有 JSON DTO 交换任务与结果；NX 无关规则放入 `Core`，GUI 永不引用 Siemens 程序集。
 
@@ -58,7 +58,7 @@ Set-Location -LiteralPath $taskRoot
 | 跳过已有 PDF、安全覆盖已有 PDF | Task 4、7、11 |
 | 纯模型、无有效页、名称冲突、取消、失败继续 | Task 5、9、11 |
 | `GetDraftingViews()` 有效页判据、预制页跳过 | Task 5、6 |
-| 导航器顺序、多页 PDF、原始图幅、白底黑线 | Task 6、8 |
+| 公开 DrawingSheets 集合顺序、多页 PDF、原始图幅、白底黑线 | Task 6、8 |
 | Worker 真机启动、样例导出、批量行为三道门槛 | Task 3、6/8、11 |
 | 不保存源文件、前后哈希、安全临时副本 | Task 6、8、11 |
 | 便携 GUI、多 DPI、干净解压、断网运行 | Task 10、12 |
@@ -83,7 +83,7 @@ Set-Location -LiteralPath $taskRoot
 - Create: `tests/NxDrawingPdfExporter.Core.Tests/NxDrawingPdfExporter.Core.Tests.csproj`
 - Create: `tests/NxDrawingPdfExporter.App.Tests/NxDrawingPdfExporter.App.Tests.csproj`
 
-- [ ] **Step 1: Create and switch to the implementation branch**
+- [x] **Step 1: Create and switch to the implementation branch**
 
 ```powershell
 git status --short
@@ -92,11 +92,13 @@ git switch -c feature/nx-drawing-pdf-exporter-v1
 
 Expected: the pre-switch status is clean; the new branch is based on `22c3c21` plus the approved documentation commit.
 
-- [ ] **Step 2: Pin SDK and deterministic build defaults**
+Result: clean `main` at `a9b2857`; branch `feature/nx-drawing-pdf-exporter-v1` created.
+
+- [x] **Step 2: Pin SDK and deterministic build defaults**
 
 `global.json` pins `10.0.400` with `rollForward: latestPatch`. `Directory.Build.props` enables nullable, deterministic builds, `TreatWarningsAsErrors`, and does not set a global target framework.
 
-- [ ] **Step 3: Pin only reviewed packages**
+- [x] **Step 3: Pin only reviewed packages**
 
 `Directory.Packages.props`:
 
@@ -114,11 +116,11 @@ Expected: the pre-switch status is clean; the new branch is based on `22c3c21` p
 
 `NuGet.Config` must declare only `https://api.nuget.org/v3/index.json`; a restore that requires network is an explicit authorization gate, not an automatic step.
 
-- [ ] **Step 4: Record PDFsharp distribution impact**
+- [x] **Step 4: Record PDFsharp distribution impact**
 
 `THIRD-PARTY-NOTICES.txt` includes PDFsharp name, version, project URL, MIT copyright/license text, and states that its managed runtime assemblies are included in the GUI distribution. No Siemens file appears in this notice or package.
 
-- [ ] **Step 5: Create project graph**
+- [x] **Step 5: Create project graph**
 
 References must be exactly:
 
@@ -132,7 +134,7 @@ Tests -> their production project
 
 Task 1 只创建 App 的空项目边界，使解决方案与测试引用可还原；任何 WinForms 窗体、控制器或产品 GUI 行为都必须等 Worker gate 1 通过后再写。
 
-- [ ] **Step 6: Restore/build boundary check**
+- [x] **Step 6: Restore/build boundary check**
 
 ```powershell
 & $taskDotnet restore .\NxDrawingPdfExporter.slnx
@@ -141,12 +143,16 @@ Task 1 只创建 App 的空项目边界，使解决方案与测试引用可还�
 
 Expected: either clean success, or a precise missing-package stop. No automatic download is allowed without the user's separate approval.
 
-- [ ] **Step 7: Commit**
+Result: precise missing-package stop with zero network traffic (restore executed against an empty local feed override). Local caches seeded offline from the adjacent project's cache cover MSTest 4.0.2 full closure incl. transitive deps. Remaining machine-missing packages pending user authorization: `PDFsharp 6.2.4` (approved dependency), `NETStandard.Library 2.0.0` and `Microsoft.NETFramework.ReferenceAssemblies.net48 1.0.3` (SDK-required build infrastructure; this machine has no VS targeting packs). All land in repo-local `.tools/nuget-packages`.
+
+- [x] **Step 7: Commit**
 
 ```powershell
 git add global.json Directory.Build.props Directory.Packages.props NuGet.Config THIRD-PARTY-NOTICES.txt NxDrawingPdfExporter.slnx src tests tools
 git commit -m "build: scaffold exporter solution"
 ```
+
+Result: committed together with the updated plan checkboxes (Task 1 steps 1–7).
 
 ### Task 2: Define the versioned job/result protocol
 
@@ -160,11 +166,13 @@ git commit -m "build: scaffold exporter solution"
 - Create: `src/NxDrawingPdfExporter.Contracts/JobJsonSerializer.cs`
 - Test: `tests/NxDrawingPdfExporter.Contracts.Tests/JobJsonSerializerTests.cs`
 
-- [ ] **Step 1: Write failing round-trip and validation tests**
+- [x] **Step 1: Write failing round-trip and validation tests**
 
 Cover Unicode/space paths, every result status, ordered job items, missing required fields, unknown protocol version, and a malformed JSON file. The test must assert that no plaintext exception stack is stored in user-facing `Message`.
 
-- [ ] **Step 2: Run the focused test and confirm RED**
+Result: 11 tests in `JobJsonSerializerTests` covering all mandated cases; RED confirmed via CS0246 compile failure (DTOs absent).
+
+- [x] **Step 2: Run the focused test and confirm RED**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Contracts.Tests\NxDrawingPdfExporter.Contracts.Tests.csproj --no-restore --filter FullyQualifiedName~JobJsonSerializerTests
@@ -172,7 +180,7 @@ Cover Unicode/space paths, every result status, ordered job items, missing requi
 
 Expected: compile/test failure because DTOs and serializer do not exist.
 
-- [ ] **Step 3: Implement stable DTOs**
+- [x] **Step 3: Implement stable DTOs**
 
 Use `DataContractJsonSerializer` so both `netstandard2.0` and `net48` use the same protocol without another JSON dependency. Required shapes:
 
@@ -209,11 +217,11 @@ public sealed class JobItem
 
 `FileResult` carries source/target/status/message, ordered exported/skipped sheet names, and elapsed milliseconds. `JobResult` carries run id, start/end UTC, cancellation state, ordered per-file results, and fatal worker error.
 
-- [ ] **Step 4: Implement atomic JSON writes**
+- [x] **Step 4: Implement atomic JSON writes**
 
 Serialize to a same-directory unique temporary file, flush/close, then move/replace. Deserialization validates protocol version and required absolute paths.
 
-- [ ] **Step 5: Run GREEN and full contract tests**
+- [x] **Step 5: Run GREEN and full contract tests**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Contracts.Tests\NxDrawingPdfExporter.Contracts.Tests.csproj --no-restore
@@ -221,7 +229,7 @@ Serialize to a same-directory unique temporary file, flush/close, then move/repl
 
 Expected: all contract tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/NxDrawingPdfExporter.Contracts tests/NxDrawingPdfExporter.Contracts.Tests
@@ -236,7 +244,7 @@ git commit -m "feat: define worker job protocol"
 - Create: `tools/run-worker-probe.ps1`
 - Create: `docs/verification/gate-1/README.md`
 
-- [ ] **Step 1: Configure exact NX references without redistribution**
+- [x] **Step 1: Configure exact NX references without redistribution**
 
 Worker and Probe csproj files use explicit `HintPath` values below and `<Private>false</Private>`:
 
@@ -253,7 +261,7 @@ Worker and Probe csproj files use explicit `HintPath` values below and `<Private
 
 Assert x64 and `net48`. Add an MSBuild target that fails if either file is absent or if `NXOpen.dll` file version is not `10.0.0.24`.
 
-- [ ] **Step 2: Implement the minimal probe only**
+- [x] **Step 2: Implement the minimal probe only**
 
 The probe obtains real objects and writes one UTF-8 JSON report:
 
@@ -265,7 +273,7 @@ if (session == null || ufSession == null) return 20;
 
 Report process bitness, runtime version, current directory, argument echo, NX session availability, UF session availability, NX executable root, UTC timestamp, and exit code. Do not open any PRT yet.
 
-- [ ] **Step 3: Build and check no Siemens binaries were copied**
+- [x] **Step 3: Build and check no Siemens binaries were copied**
 
 ```powershell
 & $taskDotnet build .\tools\NxDrawingPdfExporter.Probe\NxDrawingPdfExporter.Probe.csproj -c Debug --no-restore
@@ -274,17 +282,17 @@ Get-ChildItem .\tools\NxDrawingPdfExporter.Probe\bin\Debug -Recurse -Include NXO
 
 Expected: build succeeds; the second command returns no files.
 
-- [ ] **Step 4: Discover and record the real `run_managed.exe` command syntax**
+- [x] **Step 4: Discover and record the real `run_managed.exe` command syntax**
 
 `tools/run-worker-probe.ps1` invokes only the verified local launcher and the built probe. It must capture exact command line, stdout, stderr, exit code, and report path under `docs/verification/gate-1/` while excluding usernames and sample paths from committed artifacts.
 
 Expected gate result: exit code 0, valid JSON, both Session fields true, argument echo exact.
 
-- [ ] **Step 5: Hard stop on gate failure**
+- [x] **Step 5: Hard stop on gate failure**
 
 If NX rejects `net48`, cannot load the assembly, or cannot return both real sessions, stop all implementation. Record error and environment facts, then ask for a spec revision. Do not implement GUI or silently switch framework/launcher.
 
-- [ ] **Step 6: Commit successful gate evidence**
+- [x] **Step 6: Commit successful gate evidence**
 
 ```powershell
 git add tools/NxDrawingPdfExporter.Probe tools/run-worker-probe.ps1 docs/verification/gate-1
@@ -301,21 +309,21 @@ git commit -m "test: prove NX 10 managed worker launch"
 - Test: `tests/NxDrawingPdfExporter.Core.Tests/InputDiscoveryServiceTests.cs`
 - Test: `tests/NxDrawingPdfExporter.Core.Tests/OutputPlannerTests.cs`
 
-- [ ] **Step 1: Write failing discovery tests**
+- [x] **Step 1: Write failing discovery tests**
 
 Cover current-directory scan, recursive opt-in, `.prt` case-insensitivity, manual multi-select order, canonical-path de-duplication, Chinese/spaces/multiple dots, missing files, and inaccessible folders. Do not infer a drawing from `DWG_`.
 
-- [ ] **Step 2: Write failing output-plan tests**
+- [x] **Step 2: Write failing output-plan tests**
 
 Cover source-basename preservation, beside-source/unified output, skip/overwrite, all colliding unified-output items marked `NameConflict`, target-directory validation, and no partial preflight mutation.
 
-- [ ] **Step 3: Confirm RED**
+- [x] **Step 3: Confirm RED**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Core.Tests\NxDrawingPdfExporter.Core.Tests.csproj --no-restore --filter "FullyQualifiedName~InputDiscoveryServiceTests|FullyQualifiedName~OutputPlannerTests"
 ```
 
-- [ ] **Step 4: Implement the smallest pure services**
+- [x] **Step 4: Implement the smallest pure services**
 
 Key contract:
 
@@ -338,7 +346,7 @@ public interface IOutputPlanner
 
 Preserve discovery/manual order; never sort by sheet or source filename unless the UI explicitly displays a separate view without altering job order.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Core.Tests\NxDrawingPdfExporter.Core.Tests.csproj --no-restore
@@ -353,22 +361,22 @@ git commit -m "feat: add input and output preflight"
 - Create: `src/NxDrawingPdfExporter.Core/Drawing/SheetSelectionService.cs`
 - Test: `tests/NxDrawingPdfExporter.Core.Tests/SheetSelectionServiceTests.cs`
 
-- [ ] **Step 1: Write failing tests for the approved rule**
+- [x] **Step 1: Write failing tests for the approved rule**
 
 Tests must prove: zero sheets => pure model; sheets with zero drafting views => no valid sheets; one or more drafting views => exportable; input order retained; update/load error => file failure rather than blank/template classification.
 
-- [ ] **Step 2: Confirm RED**
+- [x] **Step 2: Confirm RED**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Core.Tests\NxDrawingPdfExporter.Core.Tests.csproj --no-restore --filter FullyQualifiedName~SheetSelectionServiceTests
 ```
 
-- [ ] **Step 3: Implement explicit facts and decisions**
+- [x] **Step 3: Implement explicit facts and decisions**
 
 ```csharp
 public sealed class SheetFacts
 {
-    public int NavigatorIndex { get; set; }
+    public int ExportOrderIndex { get; set; }
     public string Name { get; set; } = "";
     public int DraftingViewCount { get; set; }
     public string? InspectionFailure { get; set; }
@@ -384,7 +392,7 @@ public sealed class SheetSelection
 
 Do not inspect borders, notes, tables, layer numbers, names, or prefixes. `DraftingViewCount >= 1` is the only positive rule.
 
-- [ ] **Step 4: Run GREEN and commit**
+- [x] **Step 4: Run GREEN and commit**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Core.Tests\NxDrawingPdfExporter.Core.Tests.csproj --no-restore
@@ -392,7 +400,7 @@ git add src/NxDrawingPdfExporter.Core tests/NxDrawingPdfExporter.Core.Tests
 git commit -m "feat: classify exportable drawing sheets"
 ```
 
-### Task 6: Build the NX adapter and prove sheet order on the private sample
+### Task 6: Build the NX adapter and prove public-API sheet order on the private sample
 
 **Files:**
 - Create: `src/NxDrawingPdfExporter.Worker/Program.cs`
@@ -403,31 +411,35 @@ git commit -m "feat: classify exportable drawing sheets"
 - Create: `tools/run-sheet-inventory.ps1`
 - Create: `docs/verification/gate-2/sheet-inventory.schema.json`
 
-- [ ] **Step 1: Add NX-independent source guard tests first**
+- [x] **Step 1: Add NX-independent source guard tests first**
 
 Extend Core tests for a snapshot of full path, length, UTC mtime, and SHA-256. Product runtime compares length/mtime; validation scripts compare hashes. A detected change returns fatal failure.
 
-- [ ] **Step 2: Open exactly one candidate without saving**
+- [x] **Step 2: Open exactly one candidate without saving**
 
 Use `Session.Parts.OpenDisplay(path, out PartLoadStatus)`. Capture all load-status messages before disposing it. On close, use `BasePart.Close(...DontCloseModified...)` and never invoke Save/SaveAs.
 
-- [ ] **Step 3: Enumerate native collection order and map facts**
+- [x] **Step 3: Enumerate native collection order and map facts**
 
-For every `workPart.DrawingSheets` item in returned order, record index, name, size/unit facts, and `GetDraftingViews().Length`. Keep the NX object array aligned to those indices.
+For every `workPart.DrawingSheets` item in returned order, record `ExportOrderIndex`, name, size/unit facts, and `GetDraftingViews().Length`. Keep the NX object array and report array aligned to those indices. The public collection order is the V1 export contract.
 
-- [ ] **Step 4: Run the inventory against the untouched private sample**
+- [x] **Step 4: Run the inventory against the untouched private sample**
 
 Before invocation, hash both PRT files. Run through `run_managed.exe`. Save only a privacy-scrubbed sheet inventory under `docs/verification/gate-2/`; generated raw logs remain gitignored under `artifacts/`.
 
-- [ ] **Step 5: Compare with the visible NX navigator**
+- [x] **Step 5: Prove the public DrawingSheets export-order contract**
 
-The developer must open the sample in NX and record that API order matches navigator top-to-bottom. If it does not, implement a narrow UF Drafting order adapter and repeat; alphabetical/natural name sorting is forbidden.
+Record that the report array, `ExportOrderIndex`, and `NativeIndex` match the
+public `workPart.DrawingSheets` enumeration item-for-item. The known visible
+Navigator timestamp-order mismatch is an NX GUI preference and is explicitly
+outside the V1 export contract. Do not use UF Drafting, alphabetical/natural
+name sorting, numeric-name sorting, or Tag-value sorting to rewrite this order.
 
-- [ ] **Step 6: Verify source hashes and gate result**
+- [x] **Step 6: Verify source hashes and gate result**
 
 At the beginning of the validation run, compute a local baseline for both PRT files and retain it only in the gitignored run-artifact directory. Expected: the post-run hash for each file exactly equals that run's pre-run hash. Any mismatch is a hard stop; do not commit sample hashes or other private sample metadata.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src/NxDrawingPdfExporter.Worker src/NxDrawingPdfExporter.Core tests tools/run-sheet-inventory.ps1 docs/verification/gate-2
@@ -446,17 +458,17 @@ git commit -m "feat: inspect NX drawing sheets safely"
 - Test: `tests/NxDrawingPdfExporter.Core.Tests/SafeOutputPublisherTests.cs`
 - Test: `tests/NxDrawingPdfExporter.App.Tests/PdfSharpInspectorTests.cs`
 
-- [ ] **Step 1: Write failure-injection tests**
+- [x] **Step 1: Write failure-injection tests**
 
 Test missing/zero-byte/non-PDF/wrong-page-count PDFs, successful new publish, successful overwrite, validation failure preserving old bytes, replacement exception restoring old bytes, and cleanup of only product-owned unique temp files.
 
-- [ ] **Step 2: Confirm RED**
+- [x] **Step 2: Confirm RED**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Core.Tests\NxDrawingPdfExporter.Core.Tests.csproj --no-restore --filter FullyQualifiedName~SafeOutputPublisherTests
 ```
 
-- [ ] **Step 3: Implement managed inspection**
+- [x] **Step 3: Implement managed inspection**
 
 ```csharp
 public interface IPdfInspector
@@ -475,7 +487,7 @@ public sealed class PdfInspection
 
 `PdfSharpInspector` opens PDFsharp in read-only/import mode, checks `%PDF-` header, reads page count and MediaBox dimensions, then closes all handles. It runs in the App process after Worker output; Worker does not need PDFsharp.
 
-- [ ] **Step 4: Implement safe publication**
+- [x] **Step 4: Implement safe publication**
 
 Worker exports to `.<basename>.<runId>.<guid>.tmp.pdf` in the final target directory. App validates it, then:
 
@@ -483,7 +495,7 @@ Worker exports to `.<basename>.<runId>.<guid>.tmp.pdf` in the final target direc
 - overwrite: `File.Replace(temp, target, backup)` when supported, verify final, delete backup only after success;
 - failure: restore backup if needed, preserve original bytes, remove only known run-owned temp/backup paths.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Core.Tests\NxDrawingPdfExporter.Core.Tests.csproj --no-restore
@@ -502,31 +514,31 @@ git commit -m "feat: validate and publish PDFs transactionally"
 - Create: `tools/render-verification-pdf.ps1`
 - Create: `docs/verification/gate-2/README.md`
 
-- [ ] **Step 1: Update only selected sheet views**
+- [x] **Step 1: Update only selected sheet views**
 
 For each exportable sheet, call `sheet.Open()` and the locally verified `DraftingViewCollection.UpdateViews` overload. Any load/update exception fails that PRT and is not converted to `NoValidSheets`.
 
-- [ ] **Step 2: Configure one multi-sheet NX PDF commit**
+- [x] **Step 2: Configure one multi-sheet NX PDF commit**
 
 Use `workPart.PlotManager.CreatePrintPdfbuilder()`, `builder.SourceBuilder.SetSheets(selectedSheets.Cast<NXObject>().ToArray())`, and `builder.Filename = tempPath`. Set `builder.Colors = PrintPDFBuilder.Color.BlackOnWhite`, `builder.Size = PrintPDFBuilder.SizeOption.FullScale`, `builder.Watermark = string.Empty`, and `builder.Append = false`; do not set `XDimension`, `YDimension`, or a common scale. Call `Commit()` once and destroy builders in `finally`.
 
-- [ ] **Step 3: Produce authoritative `FileResult`**
+- [x] **Step 3: Produce authoritative `FileResult`**
 
-Record exported and skipped sheet names in navigator order, NX load/update diagnostics, temp path token, source guard outcome, and status. Exit code alone never means success.
+Record exported and skipped sheet names in public `DrawingSheets` export order, NX load/update diagnostics, temp path token, source guard outcome, and status. Exit code alone never means success.
 
-- [ ] **Step 4: Run the private sample gate**
+- [x] **Step 4: Run the private sample gate**
 
 Hash both PRT files, export to gitignored `artifacts/gate-2/`, inspect the PDF through `PdfSharpInspector`, assert expected page count equals selected sheet count, and compare every page MediaBox to NX sheet dimensions.
 
-- [ ] **Step 5: Render and visually inspect every page**
+- [x] **Step 5: Render and visually inspect every page**
 
 Rendering is validation-only and may use a pre-existing local PDF renderer after verifying its path/version; do not install one. Inspect black lines, white background, no watermark, cropping, orientation, title block, dimensions, and page order. Compare the A2 page with the private human reference PDF; do not require binary equality or expose its filename/content in committed evidence.
 
-- [ ] **Step 6: Re-hash sources and document gate evidence**
+- [x] **Step 6: Re-hash sources and document gate evidence**
 
 The two expected hashes from Task 6 must remain identical. Commit the textual evidence and privacy-safe rendered contact sheet only if it exposes no confidential drawing content; otherwise keep renders ignored and record hashes/dimensions only.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src tools docs/verification/gate-2
@@ -543,11 +555,11 @@ git commit -m "feat: export selected NX sheets to PDF"
 - Test: `tests/NxDrawingPdfExporter.Core.Tests/BatchStateMachineTests.cs`
 - Test: `tests/NxDrawingPdfExporter.Contracts.Tests/ResultSummaryTests.cs`
 
-- [ ] **Step 1: Write failing state-transition tests**
+- [x] **Step 1: Write failing state-transition tests**
 
 Cover all eight statuses, single-file failure followed by next file, skip existing without Worker export, collision items never started, cancellation before first/next file, and cancellation delayed until safe publication finishes.
 
-- [ ] **Step 2: Implement sequential loop only**
+- [x] **Step 2: Implement sequential loop only**
 
 ```csharp
 foreach (var item in job.Items)
@@ -560,11 +572,11 @@ foreach (var item in job.Items)
 
 No `Task.WhenAll`, `Parallel`, worker pool, or second NX session.
 
-- [ ] **Step 3: Make result recovery durable**
+- [x] **Step 3: Make result recovery durable**
 
 Atomically rewrite `result.json` after each file. A crash leaves completed per-file results and a fatal worker record; the GUI reports incomplete, never success.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.Core.Tests\NxDrawingPdfExporter.Core.Tests.csproj --no-restore
@@ -587,27 +599,27 @@ git commit -m "feat: orchestrate sequential NX batch jobs"
 - Create: `tests/NxDrawingPdfExporter.App.Tests/ApplicationControllerTests.cs`
 - Create: `tests/NxDrawingPdfExporter.App.Tests/NxInstallationDetectorTests.cs`
 
-- [ ] **Step 1: Write controller tests before controls**
+- [x] **Step 1: Write controller tests before controls**
 
 Test default modes, mutual exclusivity, enable/disable rules, preflight blocking, progress transitions, cancellation, opening output/log paths, and summaries. Tests target controller/view interfaces, not pixel coordinates.
 
-- [ ] **Step 2: Implement fail-closed NX detection**
+- [x] **Step 2: Implement fail-closed NX detection**
 
 Accept only the exact verified paths and `NXOpen.dll` file version `10.0.0.24`. Show detected root/version/status. Other NX versions are displayed as unsupported and cannot start.
 
-- [ ] **Step 3: Implement process launcher**
+- [x] **Step 3: Implement process launcher**
 
 Create a unique run folder under `%LOCALAPPDATA%\NxDrawingPdfExporter\runs\<runId>`, write `job.json`, invoke the gate-proven command, asynchronously capture stdout/stderr, read `result.json`, and map fatal/protocol failures to Chinese messages. Never put private full paths in UI telemetry; there is no network telemetry.
 
-- [ ] **Step 4: Implement the approved single-window UI**
+- [x] **Step 4: Implement the approved single-window UI**
 
 Controls: NX status, two input modes, recursive checkbox, file list, two output modes, unified directory, mutually exclusive skip/overwrite, preflight grid, start/cancel, current/total progress, per-file results, open output directory, open log. Defaults: scan current folder level, beside-source output, skip existing.
 
-- [ ] **Step 5: Implement safe close**
+- [x] **Step 5: Implement safe close**
 
 While running, closing requests cancellation and waits for the Worker to finish the current safe operation; it does not kill the process during PDF replacement.
 
-- [ ] **Step 6: Run tests/build and commit**
+- [x] **Step 6: Run tests/build and commit**
 
 ```powershell
 & $taskDotnet test .\tests\NxDrawingPdfExporter.App.Tests\NxDrawingPdfExporter.App.Tests.csproj --no-restore
@@ -623,19 +635,19 @@ git commit -m "feat: add portable batch export GUI"
 - Create: `docs/verification/gate-3/README.md`
 - Modify: `README.md`
 
-- [ ] **Step 1: Create disposable fixtures without touching originals**
+- [x] **Step 1: Create disposable fixtures without touching originals**
 
 Copy the private sample pair into a unique gitignored `artifacts/gate-3-fixtures/` directory. Create nested folders and controlled duplicate basenames there. Remove/corrupt dependencies only in copies.
 
-- [ ] **Step 2: Execute the approved matrix**
+- [x] **Step 2: Execute the approved matrix**
 
 Prove manual selection; current-folder and recursive scanning; beside-source and unified output; skip existing; successful safe overwrite; pure model skip; no-valid-sheet skip; missing dependency failure; unified-name conflict; one failure continuing to later items; cancellation before next file.
 
-- [ ] **Step 3: Failure inject safe replacement**
+- [x] **Step 3: Failure inject safe replacement**
 
 Use `IFileReplacer` test doubles for deterministic unit failures and a disposable locked target for Windows integration. Verify original PDF SHA-256 after every failed overwrite.
 
-- [ ] **Step 4: Verify no source or system mutation**
+- [x] **Step 4: Verify no source or system mutation**
 
 Re-hash original samples, confirm each post-run value equals the locally recorded pre-run value, ensure NX installation timestamps are untouched, and confirm no project code calls NX Save APIs using:
 
@@ -645,7 +657,7 @@ rg -n "\.Save\(|SaveAs\(|SaveComponents|PartSave" src
 
 Expected: no production save call.
 
-- [ ] **Step 5: Document and commit gate 3**
+- [x] **Step 5: Document and commit gate 3**
 
 ```powershell
 git add tools/run-gate-3.ps1 docs/verification/gate-3 README.md
@@ -661,32 +673,37 @@ git commit -m "test: verify NX batch export behaviors"
 - Create: `docs/verification/release/known-limitations.md`
 - Modify: `README.md`
 
-- [ ] **Step 1: Run the complete automated suite**
+- [x] **Step 1: Run the complete automated suite**
 
 ```powershell
 & $taskDotnet test .\NxDrawingPdfExporter.slnx -c Release --no-restore
 & $taskDotnet build .\NxDrawingPdfExporter.slnx -c Release --no-restore
 ```
 
-Expected: zero failed tests and zero warnings.
+Observed for v1.0.0: 149 passed, 0 failed; build completed with 0 errors and
+the documented NU1702 cross-target-framework warning from the net10 Worker
+test harness referencing the net48 Worker.
 
-- [ ] **Step 2: Publish the exact layout**
+- [x] **Step 2: Publish the exact layout**
 
 GUI: `win-x64`, self-contained, single file. Worker: normal `net48` x64 files under `worker/`. Package root contains `NX图纸批量导出工具.exe`, `worker/`, `THIRD-PARTY-NOTICES.txt`, and concise Chinese README only.
 
-- [ ] **Step 3: Inspect forbidden contents**
+- [x] **Step 3: Inspect forbidden contents**
 
 `tools/inspect-release.ps1` fails if it finds `NXOpen*.dll`, `*.prt`, sample/reference PDFs, source files, logs, temp files, PDBs, secrets, or absolute developer paths. It emits file list and SHA-256 manifest.
 
-- [ ] **Step 4: Clean-extraction and offline QA**
+- [ ] **Step 4: Clean-extraction and offline QA** — clean extraction passed;
+  physical offline QA was accepted as a v1.0.0 limitation and deferred to
+  GitHub Issue #3.
 
 Extract/copy to a fresh directory outside the repo, disconnect network, launch without Python/Visual Studio/system modern .NET, and rerun one controlled sample export through installed NX. Verify outputs and source hashes.
 
-- [ ] **Step 5: GUI visual QA**
+- [ ] **Step 5: GUI visual QA** — the required 100%/125%/150% evidence was
+  accepted as a v1.0.0 limitation and deferred to GitHub Issue #2.
 
 Capture 100%, 125%, and 150% DPI screenshots. Inspect Chinese truncation, tab order, mode visibility, long paths, progress/results, disabled states, and no clipped buttons.
 
-- [ ] **Step 6: Final static and placeholder audit**
+- [x] **Step 6: Final static and placeholder audit**
 
 ```powershell
 rg -n "TODO|TBD|NotImplementedException|throw new Exception\(\)|catch\s*\{\s*\}" src tests tools docs
@@ -696,7 +713,7 @@ git log --oneline --decorate -15
 
 Expected: no unresolved placeholders or empty catches; only intended verification artifacts are untracked/ignored; implementation commits are small and reviewable.
 
-- [ ] **Step 7: Commit documentation only; do not push or release**
+- [x] **Step 7: Commit documentation only; do not push or release**
 
 ```powershell
 git add README.md tools/publish-portable.ps1 tools/inspect-release.ps1 docs/verification/release

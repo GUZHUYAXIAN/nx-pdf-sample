@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NX Drawing Sheet Inventory",
+  "type": "object",
+  "required": ["Success", "LoadDiagnostics", "Sheets"],
+  "properties": {
+    "Success": { "type": "boolean" },
+    "Failure": { "type": ["string", "null"] },
+    "LoadDiagnostics": { "type": "array", "items": { "type": "string" } },
+    "Sheets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ExportOrderIndex", "DraftingViewCount", "Length", "Height", "Units", "NameToken", "NativeIndex"],
+        "properties": {
+          "ExportOrderIndex": { "type": "integer", "minimum": 0 },
+          "DraftingViewCount": { "type": "integer", "minimum": 0 },
+          "Length": { "type": "number", "exclusiveMinimum": 0 },
+          "Height": { "type": "number", "exclusiveMinimum": 0 },
+          "Units": { "type": "string", "minLength": 1 },
+          "NameToken": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+          "NativeIndex": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

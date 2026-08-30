@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Minimal NX session probe (Gate 1). Launched ONLY through the verified local
+    NX 10 run_managed.exe. Obtains real Session and UFSession, writes one UTF-8
+    JSON report, and exits with a stable code. Never opens any PRT.
+    NXOpen/NXOpen.UF come from build\NxReference.props (exact local HintPaths,
+    Private=false, file-version guard).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>NxDrawingPdfExporter.Probe</RootNamespace>
+    <AssemblyName>NxDrawingPdfExporter.Probe</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <OutputType>Exe</OutputType>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NxDrawingPdfExporter.Contracts\NxDrawingPdfExporter.Contracts.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\..\build\NxReference.props" />
+
+</Project>

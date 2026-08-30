@@ -1,0 +1,47 @@
+Third-Party Notices
+===================
+
+This distribution includes third-party software licensed under the terms below.
+
+-------------------------------------------------------------------------------
+
+PDFsharp 6.2.4
+--------------
+
+Project URL:   https://github.com/empira/PDFsharp
+Documentation: https://docs.pdfsharp.net/
+Package:       https://www.nuget.org/packages/PDFsharp/6.2.4
+License:       MIT
+
+The managed runtime assemblies of PDFsharp 6.2.4 are compiled into the GUI
+executable of this product (self-contained single-file distribution). PDFsharp
+is used exclusively to read PDF metadata (page count and page sizes) for output
+validation in the GUI process. It never participates in the NX export itself.
+
+MIT License
+
+Copyright (c) 2026 empira
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-------------------------------------------------------------------------------
+
+Siemens NXOpen assemblies (NXOpen.dll, NXOpen.UF.dll) are NOT included in this
+distribution. They remain part of the local Siemens NX 10 installation and are
+loaded from there at runtime.

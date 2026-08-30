@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NX 10 Worker boundary (Task 1: empty net48 x64 class library; Task 6 turns
+    this into the run_managed.exe-launched executable).
+    Siemens DLLs are referenced from the local NX installation only and are
+    never copied, committed, or redistributed.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>NxDrawingPdfExporter.Worker</RootNamespace>
+    <AssemblyName>NxDrawingPdfExporter.Worker</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NxDrawingPdfExporter.Contracts\NxDrawingPdfExporter.Contracts.csproj" />
+    <ProjectReference Include="..\NxDrawingPdfExporter.Core\NxDrawingPdfExporter.Core.csproj" />
+  </ItemGroup>
+
+  <!-- 真实故障注入测试（Worker.Tests）需要触达批处理运行器的内部测试缝隙。 -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="NxDrawingPdfExporter.Worker.Tests" />
+  </ItemGroup>
+
+  <!-- Same exact local NXOpen references and version guard as the Gate 1 probe. -->
+  <Import Project="..\..\build\NxReference.props" />
+
+</Project>

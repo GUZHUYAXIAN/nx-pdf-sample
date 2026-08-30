@@ -1,0 +1,31 @@
+﻿{
+    "utcTimestamp":  "2026-08-26T13:49:32.2416328Z",
+    "launcher":  "D:\\Program Files\\Siemens\\NX 10.0\\UGII\\run_managed.exe",
+    "launcherFileVersion":  "6.0.0.0",
+    "commandLine":  "\"D:\\Program Files\\Siemens\\NX 10.0\\UGII\\run_managed.exe\" \"E:\\Codex\\projects\\nx-pdf-sample\\tools\\NxDrawingPdfExporter.Probe\\bin\\Debug\\net48\\win-x64\\NxDrawingPdfExporter.Probe.exe\" \"E:\\Codex\\projects\\nx-pdf-sample\\artifacts\\gate-1\\20260826-134928\\probe-report.json\"",
+    "probeExe":  "E:\\Codex\\projects\\nx-pdf-sample\\tools\\NxDrawingPdfExporter.Probe\\bin\\Debug\\net48\\win-x64\\NxDrawingPdfExporter.Probe.exe",
+    "probeFileVersion":  "1.0.0.0",
+    "workingDirectory":  "E:\\Codex\\projects\\nx-pdf-sample\\artifacts\\gate-1\\20260826-134928",
+    "timeoutSeconds":  780,
+    "timedOut":  false,
+    "exitCode":  0,
+    "elapsedSeconds":  4,
+    "reportWritten":  true,
+    "report":  {
+                   "protocolVersion":  "1",
+                   "probeKind":  "nx-session-probe",
+                   "utcTimestamp":  "2026-08-26T13:49:28.7165563Z",
+                   "processBitness":  "x64",
+                   "runtimeVersion":  "4.0.30319.42000",
+                   "targetFramework":  "net48",
+                   "currentDirectory":  "E:\\Codex\\projects\\nx-pdf-sample\\artifacts\\gate-1\\20260826-134928",
+                   "argumentEcho":  [
+                                        "E:\\Codex\\projects\\nx-pdf-sample\\artifacts\\gate-1\\20260826-134928\\probe-report.json"
+                                    ],
+                   "nxSessionAvailable":  true,
+                   "ufSessionAvailable":  true,
+                   "nxRootEnvironment":  "D:\\Program Files\\Siemens\\NX 10.0\\UGII\\",
+                   "exitCode":  0,
+                   "error":  ""
+               }
+}
