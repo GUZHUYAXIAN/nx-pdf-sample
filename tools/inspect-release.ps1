@@ -107,12 +107,28 @@ foreach ($file in $files) {
 
 # Developer-path audit across ALL payload bytes, in both ASCII and UTF-16LE
 # forms, so embedded PDB/CodeView data or string literals cannot hide a
-# developer checkout or NX installation path. The exact verified NX install
-# root is an APPROVED runtime constant (fail-closed detection requires it,
-# see the approved design) and is whitelisted verbatim; any other
-# drive-qualified path under Program Files remains forbidden.
-$approvedConstants = @('D:\Program Files\Siemens\NX 10.0')
+# developer checkout or NX installation path.
+#
+# Path policy (reviewed, see docs/verification/release/README.md):
+#   * Forbidden outright: the developer checkout (E:\Codex), the offline
+#     toolchain project (nx-step-launcher), any Program Files path other
+#     than the approved NX root, and user-profile drive paths.
+#   * Generic build/source paths (containing \src\, \obj\, .cs/.cpp/.pdb…)
+#     must match a REVIEWED upstream prefix: Microsoft's official .NET
+#     runtime CI root (D:\a\_work\, inherent to the official runtime pack)
+#     and PDFsharp's upstream dev root (D:\repos\empira\, inherent to the
+#     official NuGet binary). Any other such path fails the gate and forces
+#     a fresh review.
+#   * Binary noise that merely resembles "X:\..." without source/build
+#     indicators is not treated as a path.
+$approvedPathPrefixes = @(
+    'D:\Program Files\Siemens\NX 10.0',
+    'D:\a\_work\',
+    'D:\repos\empira\'
+)
 $forbiddenLiterals = @('E:\Codex', 'D:\Program Files', 'nx-step-launcher')
+$sourcePathCandidate = [regex]'[A-Za-z]:\\[^\x00-\x08\x0b\x0c\x0e-\x1f"<>|*?]{6,140}'
+$sourcePathIndicator = [regex]'\\(src|source|obj)\\|\.(cs|cpp|hpp|pdb|vb|rs)([^A-Za-z0-9_]|$)'
 foreach ($file in $files) {
     $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
     $forms = @(
@@ -121,7 +137,7 @@ foreach ($file in $files) {
     )
     foreach ($form in $forms) {
         $scanned = $form
-        foreach ($approved in $approvedConstants) {
+        foreach ($approved in $approvedPathPrefixes) {
             $scanned = $scanned.Replace($approved, '')
         }
 
@@ -135,6 +151,25 @@ foreach ($file in $files) {
 
         if ($null -eq $hit -and $scanned -match '[A-Za-z]:\\Users\\') {
             $hit = '用户目录绝对路径'
+        }
+
+        if ($null -eq $hit) {
+            foreach ($candidateMatch in $sourcePathCandidate.Matches($scanned)) {
+                $candidate = $candidateMatch.Value
+                if (-not $sourcePathIndicator.IsMatch($candidate)) { continue }
+                $allowed = $false
+                foreach ($prefix in $approvedPathPrefixes) {
+                    if ($candidate.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        $allowed = $true
+                        break
+                    }
+                }
+
+                if (-not $allowed) {
+                    $hit = '未审知的绝对源码/构建路径: ' + $candidate
+                    break
+                }
+            }
         }
 
         if ($null -ne $hit) {

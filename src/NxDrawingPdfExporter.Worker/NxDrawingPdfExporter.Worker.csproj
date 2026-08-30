@@ -21,6 +21,11 @@
     <ProjectReference Include="..\NxDrawingPdfExporter.Core\NxDrawingPdfExporter.Core.csproj" />
   </ItemGroup>
 
+  <!-- 真实故障注入测试（Worker.Tests）需要触达批处理运行器的内部测试缝隙。 -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="NxDrawingPdfExporter.Worker.Tests" />
+  </ItemGroup>
+
   <!-- Same exact local NXOpen references and version guard as the Gate 1 probe. -->
   <Import Project="..\..\build\NxReference.props" />
 

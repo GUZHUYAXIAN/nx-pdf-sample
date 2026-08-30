@@ -75,6 +75,45 @@ try {
     if ($tamperExit -eq 0) { throw 'CR-08 自测失败：篡改后复验未失败。' }
     Write-Host 'PASS：篡改一字节即被清单复验发现。'
 
+    Write-Host '=== 自测 4：通用源码/构建路径策略（二审发现 2） ==='
+    # 4a) 已审知的第三方上游构建路径：允许（检查通过）。
+    $upstreamPackage = Join-Path $fixtureRoot 'upstream'
+    New-Item -ItemType Directory -Path $upstreamPackage | Out-Null
+    $upstreamBytes = [System.Text.Encoding]::ASCII.GetBytes(
+        'D:\a\_work\1\s\src\runtime\src\coreclr\vm\ceemain.cpp' + [char]0 +
+        'D:\repos\empira\PDFsharp\src\_obj\PDFsharp.pdb')
+    [System.IO.File]::WriteAllBytes((Join-Path $upstreamPackage 'lib.dll'), $upstreamBytes)
+    $upstreamExit = Invoke-Inspector -Package $upstreamPackage -Manifest (Join-Path $fixtureRoot 'upstream.sha256')
+    if ($upstreamExit -ne 0) { throw '上游白名单路径不应导致检查失败。' }
+    Write-Host 'PASS：已审知的上游构建路径被允许。'
+
+    # 4b) 未审知的源码/构建路径：拒绝。
+    $leakedPackage = Join-Path $fixtureRoot 'leaked-source'
+    New-Item -ItemType Directory -Path $leakedPackage | Out-Null
+    [System.IO.File]::WriteAllBytes((Join-Path $leakedPackage 'app.dll'),
+        [System.Text.Encoding]::ASCII.GetBytes('E:\dev\secret-checkout\src\program.cs'))
+    $leakedExit = Invoke-Inspector -Package $leakedPackage -Manifest (Join-Path $fixtureRoot 'leaked-source.sha256')
+    if ($leakedExit -eq 0) { throw '未审知的源码路径未被拒绝。' }
+    Write-Host 'PASS：未审知的源码/构建路径被拒绝。'
+
+    # 4c) 用户目录盘符路径：拒绝。
+    $profilePackage = Join-Path $fixtureRoot 'profile'
+    New-Item -ItemType Directory -Path $profilePackage | Out-Null
+    [System.IO.File]::WriteAllBytes((Join-Path $profilePackage 'app.dll'),
+        [System.Text.Encoding]::ASCII.GetBytes('C:\Users\somebody\source\repos\App\obj\Debug\App.pdb'))
+    $profileExit = Invoke-Inspector -Package $profilePackage -Manifest (Join-Path $fixtureRoot 'profile.sha256')
+    if ($profileExit -eq 0) { throw '用户目录路径未被拒绝。' }
+    Write-Host 'PASS：用户目录路径被拒绝。'
+
+    # 4d) 二进制噪声（形似盘符但无源码/构建指示符）：不视为路径，检查通过。
+    $noisePackage = Join-Path $fixtureRoot 'noise'
+    New-Item -ItemType Directory -Path $noisePackage | Out-Null
+    [System.IO.File]::WriteAllBytes((Join-Path $noisePackage 'bin.dat'),
+        [System.Text.Encoding]::ASCII.GetBytes("a:\r\n {1}`ne:\:S2uN~j?`0H:\random-bytes"))
+    $noiseExit = Invoke-Inspector -Package $noisePackage -Manifest (Join-Path $fixtureRoot 'noise.sha256')
+    if ($noiseExit -ne 0) { throw '二进制噪声被误判为路径。' }
+    Write-Host 'PASS：无源码/构建指示符的二进制噪声不误报。'
+
     Write-Host 'INSPECT-RELEASE SELF TEST: PASS'
 }
 finally {

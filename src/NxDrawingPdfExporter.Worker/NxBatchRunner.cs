@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using NxDrawingPdfExporter.Contracts;
 using NxDrawingPdfExporter.Core.Jobs;
 
@@ -12,6 +13,12 @@ namespace NxDrawingPdfExporter.Worker
     /// </summary>
     internal sealed class NxBatchRunner
     {
+        /// <summary>仅测试使用的条目处理器替换点；生产代码不得设置。null = 真实 NX 处理器。</summary>
+        internal static Func<IBatchItemProcessor>? ProcessorOverride { get; set; }
+
+        /// <summary>仅测试使用的快照写入替换点；null = 真实原子协议写入。第二参数为 ResultPath。</summary>
+        internal static Action<JobResult, string>? SnapshotWriterOverride { get; set; }
+
         public JobResult Run(JobRequest request)
         {
             if (request is null)
@@ -20,11 +27,27 @@ namespace NxDrawingPdfExporter.Worker
             }
 
             var machine = new BatchStateMachine(
-                new NxJobItemProcessor(),
+                CreateProcessor(),
                 new TargetProbe(),
                 new CancellationFlag(request.CancellationFlagPath));
-            return machine.Run(request, null, snapshot => JobJsonSerializer.WriteToFile(snapshot, request.ResultPath));
+            var snapshotWriter = SnapshotWriterOverride ?? DefaultSnapshotWriter;
+            return machine.Run(request, null, snapshot => snapshotWriter(snapshot, request.ResultPath));
         }
+
+        private static void DefaultSnapshotWriter(JobResult result, string resultPath)
+        {
+            JobJsonSerializer.WriteToFile(result, resultPath);
+        }
+
+        private IBatchItemProcessor CreateProcessor()
+        {
+            var factory = ProcessorOverride;
+            return factory is not null ? factory() : CreateNxProcessor();
+        }
+
+        // 非 内联：保证测试替换处理器时，NXOpen 依赖的类型加载不会发生。
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static NxJobItemProcessor CreateNxProcessor() => new NxJobItemProcessor();
 
         private sealed class TargetProbe : IBatchTargetProbe
         {

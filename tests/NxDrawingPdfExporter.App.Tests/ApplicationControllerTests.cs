@@ -274,15 +274,50 @@ namespace NxDrawingPdfExporter.App.Tests
             var run = controller.RunAsync();
 
             SpinWait.SpinUntil(() => controller.CurrentRunDirectory != null, 5000);
+            // 等到 Worker（fake）已完成全部条目并写出结果、正被 hold 阻塞时
+            // 再取消：模拟"取消请求到达时 Worker 已经做完"的时序。
+            var resultPath = Path.Combine(controller.CurrentRunDirectory!, "result.json");
+            Assert.IsTrue(SpinWait.SpinUntil(() => File.Exists(resultPath), 10000), "结果文件未在时限内写出。");
             controller.Cancel();
 
             Assert.IsTrue(File.Exists(Path.Combine(controller.CurrentRunDirectory!, "cancel.flag")));
             launcher.WaitGate.TrySetResult(true);
             await run;
 
-            // The worker decides the final cancellation statuses; the flag file
-            // is the only GUI-side cancellation action.
+            // Worker 在观察到标志前已完成全部条目：已完成的文件必须照常
+            // 发布，不得被发布阶段的取消分支误杀（二审 P1）。
             Assert.IsFalse(controller.IsBusy);
+            Assert.HasCount(2, controller.Results);
+            Assert.IsTrue(controller.Results.All(r => r.Status == FileResultStatus.Success));
+            Assert.IsTrue(File.Exists(Path.Combine(scratch, "in", "drawing1.pdf")));
+            Assert.IsTrue(File.Exists(Path.Combine(scratch, "in", "drawing2.pdf")));
+            Assert.IsEmpty(Directory.GetFiles(Path.Combine(scratch, "in"), "*.tmp.pdf"));
+        }
+
+        [TestMethod]
+        public async Task Cancel_DuringWorkerRun_PublishesCompletedFilesAndKeepsWorkerCancelledRest()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            launcher.ModelWorkerSideCancellation = true;
+            var run = controller.RunAsync();
+
+            // 用户在条目 1 完成、条目 2 未开始时点击取消（真实 Worker 随后
+            // 在文件边界取消剩余条目并返回 [Success, Cancelled]）。
+            Assert.IsTrue(launcher.FirstItemDone.Task.Wait(15000), "条目 1 未在时限内完成。");
+            controller.Cancel();
+            launcher.CancelGate.TrySetResult(true);
+            await run;
+
+            // 核心（二审 P1）：Worker 已完成的条目 1 必须照常发布，
+            // 不得因取消标志仍存在而被删除或改判。
+            Assert.AreEqual(FileResultStatus.Success, controller.Results[0].Status);
+            Assert.IsTrue(File.Exists(Path.Combine(scratch, "in", "drawing1.pdf")));
+            Assert.AreEqual(FileResultStatus.Cancelled, controller.Results[1].Status);
+            Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing2.pdf")));
+            Assert.IsEmpty(Directory.GetFiles(Path.Combine(scratch, "in"), "*.tmp.pdf"));
+            Assert.AreEqual(1, controller.Summary!.Cancelled);
+            StringAssert.Contains(controller.ProgressText, "取消");
         }
 
         [TestMethod]
@@ -397,6 +432,39 @@ namespace NxDrawingPdfExporter.App.Tests
             StringAssert.Contains(controller.ProgressText, "不匹配");
             Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing1.pdf")));
             Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing2.pdf")));
+            // 不可信结果不得残留运行临时 PDF（二审 P2）。
+            Assert.IsEmpty(Directory.GetFiles(Path.Combine(scratch, "in"), "*.tmp.pdf"));
+        }
+
+        [TestMethod]
+        public async Task Run_InvalidResultJson_CleansRunOwnedTemps()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            launcher.WriteInvalidResultJson = true;
+
+            await controller.RunAsync();
+
+            Assert.HasCount(0, controller.Results);
+            Assert.IsNull(controller.Summary);
+            Assert.IsEmpty(Directory.GetFiles(Path.Combine(scratch, "in"), "*.tmp.pdf"));
+        }
+
+        [TestMethod]
+        public async Task Run_NonSuccessWorkerResult_CleansStrayRunOwnedTemp()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            launcher.FailForSourceContains = "drawing1";
+            launcher.WriteTempForFailedItems = true;
+
+            await controller.RunAsync();
+
+            Assert.AreEqual(FileResultStatus.Failed, controller.Results[0].Status);
+            Assert.AreEqual(FileResultStatus.Success, controller.Results[1].Status);
+            // Worker 报告失败却残留的临时 PDF 属于本次运行自有垃圾，必须清理。
+            Assert.IsEmpty(Directory.GetFiles(Path.Combine(scratch, "in"), "*.tmp.pdf"));
+            Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing1.pdf")));
         }
 
         [TestMethod]
@@ -507,6 +575,21 @@ namespace NxDrawingPdfExporter.App.Tests
             public FileResultStatus? ReportStatusForAll { get; set; }
             public bool WriteGarbageTempPdfs { get; set; }
 
+            /// <summary>模拟 Worker 报告失败却残留了本次运行自有的临时 PDF。</summary>
+            public bool WriteTempForFailedItems { get; set; }
+
+            /// <summary>
+            /// 模拟真实 Worker 的文件边界取消：条目 1 完成后等待测试写入取消
+            /// 标志，再按状态机语义把后续条目标记为 Cancelled。
+            /// </summary>
+            public bool ModelWorkerSideCancellation { get; set; }
+
+            /// <summary>条目 1 完成（临时 PDF 与结果均已产生）的信号。</summary>
+            public TaskCompletionSource<bool> FirstItemDone { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            /// <summary>测试已写入取消标志、Worker 可以继续的放行门。</summary>
+            public TaskCompletionSource<bool> CancelGate { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
             /// <summary>模拟 Worker 写出损坏的 result.json（结果不可读）。</summary>
             public bool WriteInvalidResultJson { get; set; }
 
@@ -528,6 +611,7 @@ namespace NxDrawingPdfExporter.App.Tests
                 var job = JobJsonSerializer.ReadFromFile<JobRequest>(request.JobPath);
                 var files = new List<FileResult>();
                 var reported = 0;
+                var cancellationObserved = false;
                 foreach (var item in job.Items)
                 {
                     // 与真实 Worker 的状态机一致：Skip 策略下已存在的目标
@@ -540,6 +624,21 @@ namespace NxDrawingPdfExporter.App.Tests
                             FinalOutputPath = item.FinalOutputPath,
                             Status = FileResultStatus.SkippedExisting,
                             Message = "已存在，已跳过。"
+                        });
+                        continue;
+                    }
+
+                    // 与真实状态机一致：文件边界检查取消标志；一旦观察到，
+                    // 本条目与后续条目一律 Cancelled，不产生临时 PDF。
+                    if (cancellationObserved || File.Exists(job.CancellationFlagPath))
+                    {
+                        cancellationObserved = true;
+                        files.Add(new FileResult
+                        {
+                            SourcePath = item.SourcePath,
+                            FinalOutputPath = item.FinalOutputPath,
+                            Status = FileResultStatus.Cancelled,
+                            Message = "已取消，未开始。"
                         });
                         continue;
                     }
@@ -558,6 +657,11 @@ namespace NxDrawingPdfExporter.App.Tests
 
                     if (FailForSourceContains is not null && item.SourcePath.Contains(FailForSourceContains, StringComparison.Ordinal))
                     {
+                        if (WriteTempForFailedItems)
+                        {
+                            File.WriteAllBytes(item.WorkerTempOutputPath, TestPdfFactory.CreateSinglePage());
+                        }
+
                         files.Add(new FileResult
                         {
                             SourcePath = item.SourcePath,
@@ -585,6 +689,14 @@ namespace NxDrawingPdfExporter.App.Tests
                     }
 
                     // 超出完成限额的条目：Worker 已崩溃，无结果也无临时文件。
+
+                    // 模拟真实 Worker：条目 1 完成后暂停，等测试以用户身份
+                    // 写入取消标志，再让后续条目按状态机语义被取消。
+                    if (ModelWorkerSideCancellation && reported == 1 && !FirstItemDone.Task.IsCompleted)
+                    {
+                        FirstItemDone.TrySetResult(true);
+                        Assert.IsTrue(CancelGate.Task.Wait(15000), "测试未在时限内写入取消标志。");
+                    }
                 }
 
                 var result = new JobResult
@@ -593,7 +705,8 @@ namespace NxDrawingPdfExporter.App.Tests
                     StartedUtc = DateTime.UtcNow,
                     EndedUtc = DateTime.UtcNow,
                     Files = files.ToArray(),
-                    FatalError = ResultFatalError
+                    FatalError = ResultFatalError,
+                    Cancelled = cancellationObserved
                 };
                 if (WriteInvalidResultJson)
                 {

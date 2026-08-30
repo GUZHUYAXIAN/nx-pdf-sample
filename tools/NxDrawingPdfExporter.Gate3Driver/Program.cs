@@ -13,6 +13,10 @@ using NxDrawingPdfExporter.Contracts;
 // Usage:
 //   Gate3Driver scan <folder> <recursive:0|1> <beside|unified> <unifiedDir|-> <skip|overwrite> <runRoot>
 //   Gate3Driver manual <path1;path2;...> <beside|unified> <unifiedDir|-> <skip|overwrite> <runRoot>
+//   Gate3Driver cancel <path1;path2;...> <beside|unified> <unifiedDir|-> <skip|overwrite> <runRoot>
+//     (cancel: end-to-end boundary-cancellation proof — as soon as any run
+//      temp PDF appears, i.e. while item 1 is still exporting, the driver
+//      requests cancellation through the REAL controller.Cancel() path)
 internal static class Program
 {
     private static async Task<int> Main(string[] args)
@@ -42,13 +46,48 @@ internal static class Program
             controller.ManualPaths = args[1].Split(';', StringSplitOptions.RemoveEmptyEntries);
             ApplyOutput(controller, args[2], args[3], args[4]);
         }
+        else if (string.Equals(args[0], "cancel", StringComparison.Ordinal))
+        {
+            controller.InputMode = GuiInputMode.ManualSelection;
+            controller.ManualPaths = args[1].Split(';', StringSplitOptions.RemoveEmptyEntries);
+            ApplyOutput(controller, args[2], args[3], args[4]);
+        }
         else
         {
             Console.Error.WriteLine("未知场景: " + args[0]);
             return 2;
         }
 
-        await controller.RunAsync();
+        var runTask = controller.RunAsync();
+        if (string.Equals(args[0], "cancel", StringComparison.Ordinal))
+        {
+            var watchDirs = controller.ManualPaths
+                .Select(Path.GetDirectoryName!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var deadline = DateTime.UtcNow.AddMinutes(15);
+            while (!runTask.IsCompleted && DateTime.UtcNow < deadline)
+            {
+                if (watchDirs.Any(dir => Directory.EnumerateFiles(dir!, "*.tmp.pdf").Any()))
+                {
+                    // 条目 1 的临时 PDF 已出现（导出进行中）：走真实
+                    // controller.Cancel() 路径写入取消标志。
+                    Console.Error.WriteLine("cancel-driver: temp PDF observed, requesting cancellation");
+                    controller.Cancel();
+                    break;
+                }
+
+                await Task.Delay(10);
+            }
+
+            if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+            {
+                Console.Error.WriteLine("cancel-driver: failed to observe a temp PDF before the run ended");
+                return 3;
+            }
+        }
+
+        await runTask;
 
         var payload = new
         {

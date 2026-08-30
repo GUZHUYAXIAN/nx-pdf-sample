@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    CR-04 真实故障注入验证（二审发现 5）：通过真实的 Program.Main →
+    NxBatchRunner → BatchStateMachine → JobJsonSerializer 路径注入
+    "第一份快照成功写入、后续快照写入抛错" 的持久化故障。
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\NxDrawingPdfExporter.Worker\NxDrawingPdfExporter.Worker.csproj" />
+  </ItemGroup>
+
+</Project>

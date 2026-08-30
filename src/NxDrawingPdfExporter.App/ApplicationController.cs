@@ -296,6 +296,8 @@ namespace NxDrawingPdfExporter.App
             catch (Exception error)
             {
                 runLog.Write("Worker 未写出有效的 result.json: " + SingleLine(error.Message));
+                // 不可信结果：不发布任何文件，也不残留运行临时 PDF。
+                CleanAllRunOwnedTemps(request, runLog);
                 ProgressText = "Worker 未写出有效结果文件，本次运行不能视为成功。";
                 return;
             }
@@ -304,6 +306,7 @@ namespace NxDrawingPdfExporter.App
             if (!string.Equals(result.RunId, runId, StringComparison.Ordinal))
             {
                 runLog.Write("Worker 结果文件的 RunId 与本次运行不符，拒绝发布任何文件。");
+                CleanAllRunOwnedTemps(request, runLog);
                 Results = readyItems.Select(item => new FileResult
                 {
                     SourcePath = item.SourcePath,
@@ -318,7 +321,10 @@ namespace NxDrawingPdfExporter.App
 
             // 逐文件验证并事务性发布；只有通过校验的临时 PDF 才会成为正式输出。
             // 跳过项来自预检查，从未进入 Worker 任务。
-            // 取消请求在两个发布操作之间生效：当前发布原子完成，其余不再发布。
+            // 取消语义：Worker 退出时标志若已存在，说明 Worker 已按文件边界
+            // 处理过取消——已完成的条目必须照常发布，不得重复取消；只有
+            // Worker 退出后新出现的标志才属于发布阶段的新取消请求。
+            var flagPresentAtWorkerExit = IsCancellationRequested();
             var publisher = new SafeOutputPublisher(services.PdfInspector, services.FileReplacer);
             var workerResults = result.Files
                 .GroupBy(f => f.SourcePath, StringComparer.OrdinalIgnoreCase)
@@ -341,7 +347,7 @@ namespace NxDrawingPdfExporter.App
                     continue;
                 }
 
-                if (!cancellationRequested && IsCancellationRequested())
+                if (!cancellationRequested && !flagPresentAtWorkerExit && IsCancellationRequested())
                 {
                     cancellationRequested = true;
                     runLog.Write("发布阶段检测到取消请求：完成当前文件后不再发布后续文件。");
@@ -393,6 +399,10 @@ namespace NxDrawingPdfExporter.App
             {
                 ProgressText = "已取消：已在文件边界停止发布。";
             }
+            else if (result.Cancelled)
+            {
+                ProgressText = "已按要求取消：已完成的文件已发布，其余文件未执行。";
+            }
             else
             {
                 ProgressText = "运行完成。";
@@ -427,10 +437,22 @@ namespace NxDrawingPdfExporter.App
             }
         }
 
+        /// <summary>整体拒绝发布（结果不可信）时清理全部运行自有临时 PDF。</summary>
+        private void CleanAllRunOwnedTemps(JobRequest request, RunLog runLog)
+        {
+            foreach (var item in request.Items)
+            {
+                DeleteRunOwnedTemp(request, item.SourcePath, runLog);
+            }
+        }
+
         private FileResult PublishOne(JobRequest request, FileResult fileResult, SafeOutputPublisher publisher, RunLog runLog)
         {
             if (fileResult.Status != FileResultStatus.Success)
             {
+                // 非 Success 的条目不存在可发布的临时 PDF；若 Worker 因异常
+                // 残留了本次运行自有的临时文件，一律清理，绝不发布未校验内容。
+                DeleteRunOwnedTemp(request, fileResult.SourcePath, runLog);
                 return fileResult;
             }
 
