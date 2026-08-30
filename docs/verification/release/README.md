@@ -102,13 +102,16 @@ The product runtime contains no networking code: a source-tree audit for
 `ServicePoint` finds no hits in product `.cs` files (only framework file
 lists inside build artifacts mention such assembly names), and the entire
 build/publish/test pipeline ran against the repo-local NuGet cache without
-network access. A physically disconnected clean-extraction run remains an
-open acceptance item (EV-05) and must be performed by the user; the static
-audit is supporting evidence, not a substitute.
+network access. A physically disconnected clean-extraction run was not
+performed; the user accepted this as a v1.0.0 release limitation and deferred
+it to GitHub Issue #3. The static audit remains supporting evidence, not a
+substitute for that future run.
 
 ## Final audits
 
-- Release test + build: 0 failed tests, 0 warnings, 0 errors.
+- Release tests: 149 passed, 0 failed. Build completed with 0 errors; the
+  Worker test ProjectReference emits the known NU1702 cross-target-framework
+  compatibility warning (net10 test harness referencing the net48 Worker).
 - Placeholder audit
   (`rg "TODO|TBD|NotImplementedException|throw new Exception\(\)|catch\s*\{\s*\}"`
   over src/tests/tools): no hits.

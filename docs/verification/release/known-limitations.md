@@ -37,14 +37,16 @@
    controls (text boxes, list views, buttons) still carry fixed pixel
    `Left`/`Top`/`Width`/`Height` values, so clipping or overlap at higher
    scaling factors — especially with Chinese text and long paths — is an
-   untested risk. Visual QA at 125%/150% is required before acceptance;
-   refactor to docking/anchored layouts only if that QA exposes defects.
+   untested risk. The user accepted this as a v1.0.0 release limitation and
+   deferred the remaining visual QA to GitHub Issue #2; refactor to
+   docking/anchored layouts only if that QA exposes defects.
 
 7. **Offline verification.** The machine's network was not disabled during
    QA (system configuration boundary). The offline claim rests on a source
    audit: product code contains no networking APIs, and the entire
    build/publish/test pipeline ran against the repo-local NuGet cache
-   without network access.
+   without network access. The user accepted this as a v1.0.0 release
+   limitation and deferred the physical offline run to GitHub Issue #3.
 
 8. **Single NX session, sequential processing.** Files are processed one at
    a time in one NX session started through `run_managed.exe`. Cancellation

@@ -224,3 +224,14 @@ Verification for the addendum:
 Still open before acceptance (unchanged): EV-04 user DPI screenshots,
 EV-05 user disconnected run, design-spec names + history decision, final
 checkbox reconciliation.
+
+## Release decision addendum (2026-08-30)
+
+The user subsequently authorized v1.0.0 release with EV-04 and EV-05 kept as
+explicit known limitations rather than claimed as completed evidence. EV-04
+is tracked by GitHub Issue #2 and EV-05 by Issue #3 for a future major-version
+work cycle. The approved design sample identifiers and all reachable `main`
+and feature-branch history were sanitized before the repository can ever be
+made public. Final checklist reconciliation records the two deferred items as
+unchecked with their issue references; all implemented and evidenced steps
+are checked.
