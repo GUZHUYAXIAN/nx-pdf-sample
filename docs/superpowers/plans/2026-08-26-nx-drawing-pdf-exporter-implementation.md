@@ -680,7 +680,9 @@ git commit -m "test: verify NX batch export behaviors"
 & $taskDotnet build .\NxDrawingPdfExporter.slnx -c Release --no-restore
 ```
 
-Expected: zero failed tests and zero warnings.
+Observed for v1.0.0: 149 passed, 0 failed; build completed with 0 errors and
+the documented NU1702 cross-target-framework warning from the net10 Worker
+test harness referencing the net48 Worker.
 
 - [x] **Step 2: Publish the exact layout**
 
@@ -696,7 +698,7 @@ GUI: `win-x64`, self-contained, single file. Worker: normal `net48` x64 files un
 
 Extract/copy to a fresh directory outside the repo, disconnect network, launch without Python/Visual Studio/system modern .NET, and rerun one controlled sample export through installed NX. Verify outputs and source hashes.
 
-- [ ] **Step 5: GUI visual QA** — 100% evidence exists; 125%/150% QA was
+- [ ] **Step 5: GUI visual QA** — the required 100%/125%/150% evidence was
   accepted as a v1.0.0 limitation and deferred to GitHub Issue #2.
 
 Capture 100%, 125%, and 150% DPI screenshots. Inspect Chinese truncation, tab order, mode visibility, long paths, progress/results, disabled states, and no clipped buttons.

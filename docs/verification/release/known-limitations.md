@@ -28,17 +28,17 @@
    export report validation is the only success evidence; harnesses and the
    GUI treat it accordingly.
 
-6. **DPI screenshots.** GUI visual QA was performed at the machine's current
-   100% scaling only. 125%/150% screenshots require temporarily changing the
-   system display scaling, which is a machine configuration change outside
-   the authorized boundaries. Mitigations in place: PerMonitorV2 manifest and
+6. **DPI screenshots.** The required 100%/125%/150% screenshots and complete
+   GUI visual inspection were not performed. Changing display scaling is a
+   machine configuration action outside the automated validation boundary.
+   Mitigations in place: PerMonitorV2 manifest and
    DPI-aware `AutoScaleMode`; group-level layout uses
    `TableLayoutPanel`/`FlowLayoutPanel`/`AutoSize`. However, several inner
    controls (text boxes, list views, buttons) still carry fixed pixel
    `Left`/`Top`/`Width`/`Height` values, so clipping or overlap at higher
    scaling factors — especially with Chinese text and long paths — is an
    untested risk. The user accepted this as a v1.0.0 release limitation and
-   deferred the remaining visual QA to GitHub Issue #2; refactor to
+   deferred the visual QA to GitHub Issue #2; refactor to
    docking/anchored layouts only if that QA exposes defects.
 
 7. **Offline verification.** The machine's network was not disabled during

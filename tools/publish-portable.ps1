@@ -34,7 +34,7 @@ New-Item -ItemType Directory -Path $packageRoot | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $packageRoot 'worker') | Out-Null
 
 Write-Host '=== 发布 GUI（win-x64 自包含单文件） ==='
-& $taskDotnet publish (Join-Path $repoRoot 'src\NxDrawingPdfExporter.App\NxDrawingPdfExporter.App.csproj') -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:DebugType=None /p:DebugSymbols=false
+& $taskDotnet publish (Join-Path $repoRoot 'src\NxDrawingPdfExporter.App\NxDrawingPdfExporter.App.csproj') -c Release -r win-x64 --self-contained true --no-restore /p:PublishSingleFile=true /p:DebugType=None /p:DebugSymbols=false
 if ($LASTEXITCODE -ne 0) { throw 'GUI 发布失败。' }
 
 $guiPublish = Join-Path $repoRoot 'src\NxDrawingPdfExporter.App\bin\Release\net10.0-windows\win-x64\publish'

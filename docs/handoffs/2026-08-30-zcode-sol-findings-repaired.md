@@ -2,10 +2,10 @@
 
 - Date: 2026-08-30
 - Branch: `feature/nx-drawing-pdf-exporter-v1`
-- Review input: `docs/handoffs/2026-08-30-sol-code-review-findings.md`
-  (HEAD reviewed: `df4bdd6`)
-- Repair range for second review: `df4bdd6..4bf14ef` (5 commits)
-- Second-round repairs after the second review: `4bf14ef..HEAD` (see the
+- Review input: local-only `docs/handoffs/2026-08-30-sol-code-review-findings.md`
+  (intentionally untracked; HEAD reviewed after history sanitization: `56dcf3c`)
+- Repair range for second review: `56dcf3c..1c94404` (5 commits)
+- Second-round repairs after the second review: `1c94404..HEAD` (see the
   addendum at the bottom of this file)
 - Scope: code/tool repairs with RED→GREEN regression tests, Gate 3 rerun,
   package rebuild and re-verification. No push, no tag, no release. No
@@ -15,11 +15,11 @@
 
 | Commit | Content |
 |---|---|
-| `5c4880f` | CR-01/02/03/05: per-run state reset, all-skipped short-circuit, publish-boundary cancellation, RunId ownership + FatalError handling (7 new App tests) |
-| `7a3f4f9` | CR-04: `FatalResultMerger` preserves the durable snapshot on worker fatal error (7 new Core tests); Worker `RunJob` merges instead of overwriting |
-| `0615660` | CR-06: final PDF revalidated after overwrite before backup deletion (3 new Core tests) |
-| `fd606ee` | CR-07/08/09: byte-level release inspection + UTF-8 manifest self-verify + fixture self-test; Release `DebugType=none` + `PathMap`; synthetic test names; Gate 3 private-pair discovery + tracked-file privacy scan; new `FixtureBuilder` tool |
-| `4bf14ef` | Docs: fresh Gate 3/release evidence, corrected claims (EV-06), accurate DPI limitation (EV-04 statement part), README status downgrade (EV-07) |
+| `ef2fcb0` | CR-01/02/03/05: per-run state reset, all-skipped short-circuit, publish-boundary cancellation, RunId ownership + FatalError handling (7 new App tests) |
+| `fe2da72` | CR-04: `FatalResultMerger` preserves the durable snapshot on worker fatal error (7 new Core tests); Worker `RunJob` merges instead of overwriting |
+| `5bca0e5` | CR-06: final PDF revalidated after overwrite before backup deletion (3 new Core tests) |
+| `71efedb` | CR-07/08/09: byte-level release inspection + UTF-8 manifest self-verify + fixture self-test; Release `DebugType=none` + `PathMap`; synthetic test names; Gate 3 private-pair discovery + tracked-file privacy scan; new `FixtureBuilder` tool |
+| `1c94404` | Docs: fresh Gate 3/release evidence, corrected claims (EV-06), accurate DPI limitation (EV-04 statement part), README status downgrade (EV-07) |
 
 ## Finding → resolution map
 
@@ -117,7 +117,8 @@
 ## Verification evidence for the second review
 
 - Test suites (all re-run after fixes): Contracts 19, Core 94, App 31 —
-  0 failures. Release suite + build: 0 failures, 0 warnings (gated by
+  0 failures. Release suite + build: 0 failures, 0 errors, with the known
+  NU1702 Worker-test cross-target-framework compatibility warning (gated by
   `publish-portable.ps1`, which aborts on failure; run completed
   `PUBLISH OK`).
 - Gate 3 full rerun: PASS, exit 0, 2026-08-30. Log (gitignored):
@@ -149,7 +150,7 @@
 ## Addendum — second-round repairs (2026-08-30, after the second review)
 
 The second review accepted the reproduced tests/build but listed 3 P1 and
-2 P2 items ("暂不通过"). Resolution, all on commit `efcc5ba` plus doc
+2 P2 items ("暂不通过"). Resolution, all on commit `fb785ff` plus doc
 updates:
 
 1. **[P1] Worker-stage cancellation discarded the completed current file.**
@@ -209,7 +210,8 @@ updates:
 Verification for the addendum:
 
 - Full Release suite during the package rebuild: Contracts 19 + Core 94 +
-  Worker 2 + App 34 = **149 passed, 0 failed**; Release build 0 warnings.
+  Worker 2 + App 34 = **149 passed, 0 failed**; Release build 0 errors with
+  the known NU1702 Worker-test compatibility warning.
 - Gate 3 rerun with S12 and per-scenario hash reports: **PASS, exit 0**
   (`artifacts/gate-3-run-r3.log`; an earlier r2 attempt passed S1–S11 but
   aborted at S12 on a PowerShell 5.1 native-stderr quirk — the driver was
