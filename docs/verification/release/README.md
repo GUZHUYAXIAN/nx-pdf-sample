@@ -34,19 +34,36 @@ rebuilt payloads contain none.
 
 `tools/inspect-release.ps1` scans every package file by name (Siemens DLLs,
 `.prt`/`.pdf`, sources, logs/temp/PDBs, secrets, private name maps) AND
-scans every payload's raw bytes — both ASCII and UTF-16LE forms — for
-developer paths (`E:\Codex`, `nx-step-launcher`, any `D:\Program Files`
-other than the approved NX-root runtime constant, and user-profile drive
-paths). The exact verified NX install root
-`D:\Program Files\Siemens\NX 10.0` is an approved runtime constant required
-by fail-closed detection (see the approved design) and is whitelisted
-verbatim.
+scans every payload's raw bytes — both ASCII and UTF-16LE forms.
 
-Result on the rebuilt package: **PASS** over 7 files, zero developer-path
-hits. A self-test fixture
-(`tools/test-inspect-release.ps1`) proves the inspector rejects a binary
-payload embedding a forbidden path (ASCII and UTF-16LE), round-trips
-Chinese/space filenames, and detects a single flipped byte.
+**Path policy (explicit, reviewed; second-review finding 2).** The package
+must not reveal this developer's machine, and every embedded absolute
+build/source path must be accounted for:
+
+- Forbidden outright: the developer checkout (`E:\Codex`), the offline
+  toolchain project (`nx-step-launcher`), any `D:\Program Files` path other
+  than the approved NX root, and user-profile drive paths (`X:\Users\`).
+- Generic build/source paths — candidates containing source/build
+  indicators (`\src\`, `\source\`, `\obj\`, `.cs`, `.cpp`, `.hpp`, `.pdb`,
+  `.vb`, `.rs`) — must start with a REVIEWED upstream prefix; anything else
+  fails the gate and forces a fresh review. The reviewed allowlist:
+  - `D:\Program Files\Siemens\NX 10.0` — the approved runtime constant
+    required by fail-closed detection (see the approved design);
+  - `D:\a\_work\` — Microsoft's official .NET runtime CI root, inherent to
+    the official `microsoft.netcore.app.runtime.win-x64` pack and identical
+    for every consumer;
+  - `D:\repos\empira\` — PDFsharp's upstream dev root, inherent to the
+    official PDFsharp 6.2.4 NuGet binary.
+- Binary noise that merely resembles `X:\...` without any source/build
+  indicator is not treated as a path (the runtime binary contains random
+  byte sequences that would otherwise make the gate unusable).
+
+A self-test fixture (`tools/test-inspect-release.ps1`, 7 scenarios) proves:
+a binary embedding the developer checkout path is rejected in both ASCII
+and UTF-16LE encodings; the manifest round-trips Chinese/space filenames
+and detects a single flipped byte; reviewed upstream paths are allowed;
+unknown source paths and user-profile paths are rejected; and binary noise
+without indicators is not misreported.
 
 ## SHA-256 manifest (CR-08)
 
@@ -69,9 +86,9 @@ pair (drawing + model, so component loading succeeds):
 
 - export report: Success (status 0), `FatalError` null;
 - PDF: valid header, 1 page, MediaBox 1683.78 × 1190.55 pt = A2 594 × 420 mm,
-  length 163,102 bytes (measured on this build; no binary-equality claim is
-  made against other runs — acceptance is semantic: header, page count,
-  MediaBox, rendered visual QA);
+  length 163,101 bytes (measured on the rebuilt package; export lengths
+  vary by ±1 byte between runs, so no binary-equality claim is made —
+  acceptance is semantic: header, page count, MediaBox, rendered visual QA);
 - original sample pair SHA-256: before/after equal.
 
 The same run also demonstrated the missing-dependency rule end-to-end: a

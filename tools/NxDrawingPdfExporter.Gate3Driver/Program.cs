@@ -66,23 +66,25 @@ internal static class Program
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             var deadline = DateTime.UtcNow.AddMinutes(15);
+            var cancelled = false;
             while (!runTask.IsCompleted && DateTime.UtcNow < deadline)
             {
                 if (watchDirs.Any(dir => Directory.EnumerateFiles(dir!, "*.tmp.pdf").Any()))
                 {
                     // 条目 1 的临时 PDF 已出现（导出进行中）：走真实
-                    // controller.Cancel() 路径写入取消标志。
-                    Console.Error.WriteLine("cancel-driver: temp PDF observed, requesting cancellation");
+                    // controller.Cancel() 路径写入取消标志。必须保持
+                    // stdout/stderr 纯净：PS 5.1 在 Stop 偏好下会把原生
+                    // stderr 输出变成终止性错误。
                     controller.Cancel();
+                    cancelled = true;
                     break;
                 }
 
                 await Task.Delay(10);
             }
 
-            if (runTask.IsCompleted || DateTime.UtcNow >= deadline)
+            if (!cancelled)
             {
-                Console.Error.WriteLine("cancel-driver: failed to observe a temp PDF before the run ended");
                 return 3;
             }
         }

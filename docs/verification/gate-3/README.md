@@ -1,10 +1,10 @@
 # Gate 3 — Batch Modes and Failure Paths on Disposable Copies
 
-- Date: 2026-08-30 (rerun after the SOL review repairs; original run
-  2026-08-29 during Task 11)
+- Date: 2026-08-30 (second rerun after the second SOL review; previous runs
+  2026-08-29 and 2026-08-30)
 - Scope: Task 11 of the approved implementation plan, plus the EV-01/EV-02/
-  EV-03 and CR-09 repair items from
-  `docs/handoffs/2026-08-30-sol-code-review-findings.md`.
+  EV-03/CR-09 items and the second-review findings (boundary cancel through
+  the real GUI path, per-scenario source-hash reports, generic path policy).
 - Privacy: all fixtures and raw run artifacts live under gitignored
   `artifacts/gate-3-fixtures/`. No private names, paths, or hashes are
   committed. Originals were never touched.
@@ -44,6 +44,7 @@ must find zero hits for the discovered private base names.
 | S9 | Cancellation flag present before the first file | JobResult.Cancelled true; item Cancelled; no output produced |
 | S10 | Cancellation requested DURING item 1 (EV-02) | Harness polls for item 1's temp PDF and writes the cancel flag the moment it appears (item 1 mid-plot). Item 1 finishes atomically with Status=Success and a valid temp PDF; item 2 is `Cancelled` (status 6) with no temp file and no output; `result.json` reports `Cancelled=true` |
 | S11 | Real no-valid-sheet PRT followed by a valid drawing (EV-03) | `NoValidSheets` for the fixture (no PDF, no temp leftover), then a real `Success` export with page-count-verified PDF |
+| S12 | END-TO-END boundary cancellation through the real ApplicationController (second-review finding 1) | Driver mode `cancel` requests cancellation via the real `controller.Cancel()` the moment item 1's temp PDF appears. The real worker returns `[Success, Cancelled]`; the real GUI publication loop MUST publish the completed item 1 (valid final PDF, page-count verified) and keep item 2 `Cancelled` with no output and no temp leftovers; progress text states the cancellation |
 
 Notes on the new scenarios:
 
@@ -78,7 +79,18 @@ Per the approved design, missing dependencies must fail that PRT. Fixes:
 The gate was rerun in full after the fix and passed; the 2026-08-30 rerun
 confirmed it again.
 
-## Protection checks (after the full matrix, 2026-08-30 run)
+## Per-scenario source-hash protection (second-review finding 3)
+
+Every scenario's real NX work is wrapped in `Invoke-ProtectedScenario`: the
+harness records SHA-256 of EVERY `.prt` in the directories that scenario
+actually opens (the disposable drawing AND its associated model copies)
+immediately before and after the run, fails hard on any change or unexpected
+file, and appends a structured entry to
+`artifacts/gate-3-fixtures/<guid>/source-hash-report.json` (gitignored,
+evidence only). The final global check additionally re-verifies the
+untouched originals under `samples\private`.
+
+## Protection checks (after the full matrix, 2026-08-30 second rerun)
 
 - CR-09 privacy scan before NX work: zero tracked-file hits for the private
   base names.
@@ -91,7 +103,11 @@ confirmed it again.
 
 ## Static verification after the repair commits
 
-- Contracts tests: 19 passed; Core tests: 94 passed; App tests: 31 passed
-  (all suites re-run after the CR-01…CR-06 fixes).
+- Contracts tests: 19 passed; Core tests: 94 passed; App tests: 34 passed;
+  Worker fault-injection tests: 2 passed (Release suite total 149, 0
+  failures, re-run during the package rebuild).
 - Release build: 0 warnings, 0 errors (with the new Release symbol policy).
-- Run log: `artifacts/gate-3-run-20260830-015258.log` (gitignored).
+- Run logs (gitignored): `artifacts/gate-3-run-r3.log` (final PASS run),
+  `artifacts/gate-3-run-20260830-153626-r2.log` (S1–S11 PASS; S12 aborted
+  by a PowerShell 5.1 stderr quirk in the driver, fixed by keeping the
+  driver's stdout/stderr pure).
