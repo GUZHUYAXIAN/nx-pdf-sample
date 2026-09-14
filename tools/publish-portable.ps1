@@ -9,14 +9,22 @@
 #
 # Usage (Windows PowerShell 5.1):
 #   powershell -NoProfile -File tools\publish-portable.ps1
-param()
+param(
+    [string]$PackageCache,
+    [string]$ReleaseRoot
+)
 
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $taskDotnet = 'E:\Codex\projects\nx-step-launcher\.tools\dotnet\dotnet.exe'
-$env:DOTNET_CLI_HOME = Join-Path $repoRoot '.tools\dotnet-cli-home'
-$env:NUGET_PACKAGES = Join-Path $repoRoot '.tools\nuget-packages'
+if (-not $env:DOTNET_CLI_HOME) { $env:DOTNET_CLI_HOME = Join-Path $repoRoot '.tools\dotnet-cli-home' }
+$env:DOTNET_GENERATE_ASPNET_CERTIFICATE = 'false'
+$env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+$env:DOTNET_NOLOGO = '1'
+if (-not $PackageCache) { $PackageCache = Join-Path $repoRoot '.tools\nuget-packages' }
+if (-not (Test-Path -LiteralPath $PackageCache -PathType Container)) { throw 'Existing offline package cache is required.' }
+$env:NUGET_PACKAGES = $PackageCache
 $env:NUGET_HTTP_CACHE_PATH = Join-Path $repoRoot '.tools\nuget-http-cache'
 
 Write-Host '=== Release 测试 ==='
@@ -27,9 +35,9 @@ Write-Host '=== Release 构建 ==='
 & $taskDotnet build (Join-Path $repoRoot 'NxDrawingPdfExporter.slnx') -c Release --no-restore
 if ($LASTEXITCODE -ne 0) { throw 'Release 构建失败。' }
 
-$releaseRoot = Join-Path $repoRoot 'artifacts\release'
+if (-not $ReleaseRoot) { $ReleaseRoot = Join-Path $repoRoot 'artifacts\release' }
 $packageRoot = Join-Path $releaseRoot 'package'
-if (Test-Path $releaseRoot) { Remove-Item $releaseRoot -Recurse -Force }
+if (Test-Path -LiteralPath $releaseRoot) { throw 'Release directory already exists; select a fresh -ReleaseRoot to preserve prior evidence.' }
 New-Item -ItemType Directory -Path $packageRoot | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $packageRoot 'worker') | Out-Null
 
@@ -58,7 +66,7 @@ Copy-Item (Join-Path $repoRoot 'THIRD-PARTY-NOTICES.txt') (Join-Path $packageRoo
 NX 图纸批量导出工具（便携版）
 
 1. 双击 NX图纸批量导出工具.exe 运行；无需安装任何运行库。
-2. 仅支持 Windows 11 x64 与 Siemens NX 10.0.0.24（NX 需已安装在本机）。
+2. 仅支持 Windows 11 x64 与 Siemens NX 10.0.0.24；程序会自动检测已安装的 NX，无法确定时可手动选择 NX 根目录。
 3. 选择扫描文件夹或手动多选 PRT，选择输出方式后执行预检查，再开始导出。
 4. 导出过程逐个处理文件；导出的 PDF 会先通过校验再正式发布。
 5. 本工具不联网、不修改源 PRT、不修改 NX 安装和系统配置。

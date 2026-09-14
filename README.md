@@ -6,9 +6,19 @@
 
 ## 当前状态
 
-**v1.0.0 发布版**（2026-08-30）。批准计划的 Task 1–12 已实现，三道真机门槛与发布包均已验证（证据位于 `docs/verification/`）。2026-08-30 独立评审（SOL）发现的问题已经过两轮修复与二次复核；最终验证包括 Gate 3 十二场景 PASS、149 项测试全绿以及发布包完整性检查通过。用户明确接受将两项机器配置相关 QA 作为 v1.0.0 已知限制延期：多 DPI GUI 视觉验收见 [Issue #2](https://github.com/GUZHUYAXIAN/nx-pdf-sample/issues/2)，物理断网实机 QA 见 [Issue #3](https://github.com/GUZHUYAXIAN/nx-pdf-sample/issues/3)。它们未被表述为已经验证，将在后续大版本工作中统一处理。
+**V2 实施候选版 r2**（状态更新于 2026-09-14）。已实现有界自动发现与手动选择兜底，修复选择重入、带引号环境路径和诊断留存问题；多候选选定后仍可切换，显示根目录与版本。最近一次 Release 测试（2026-09-13）200/200 通过。用户现要求不再等待本机 NX、三档 DPI、物理断网及同事异路径验收证据，继续收尾；这些项目记为“用户放行、证据未核验”，不是实测通过。未宣称 V2 全部验证完成或已发布，也未操作远程 Issue 状态。
+
+当前证据与待验收矩阵见 [V2 验证状态](docs/verification/v2/README.md)，
+审查边界见 [实施评审交接](docs/handoffs/2026-09-08-v2-implementation-review.md)。
 
 ## 使用方式
+
+V2 不内置开发机 NX 安装路径。自动发现读取已保存配置、注册表、已安装程序项和
+当前进程环境变量；缺少有效线索时，使用“手动选择 NX 目录”，选择包含 `UGII`
+的根目录。自动和手动路径均须通过 NXOpen.dll `10.0.0.24` 精确版本验证。
+
+检测问题的脱敏诊断保存在 `%LocalAppData%\NxDrawingPdfExporter\diagnostics\run.log`，
+仅包含错误代码、来源与异常类型；没有检测问题时不会创建该日志。
 
 - 启动 `NX图纸批量导出工具.exe`（发布包）或调试构建的 `NxDrawingPdfExporter.App.exe`。
 - 工具仅支持 Windows 11 x64 与本机已安装的 Siemens NX 10.0.0.24；检测不到该精确版本时会拒绝运行。

@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using NxDrawingPdfExporter.App.Configuration;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NxDrawingPdfExporter.App.Logging;
 using NxDrawingPdfExporter.App.Pdf;
 using NxDrawingPdfExporter.App.Runtime;
+using NxDrawingPdfExporter.App.Runtime.Detection;
 using NxDrawingPdfExporter.Contracts;
 using NxDrawingPdfExporter.Core.Jobs;
 using NxDrawingPdfExporter.Core.Output;
@@ -49,14 +51,25 @@ namespace NxDrawingPdfExporter.App.Tests
                 WorkerLauncher = launcher,
                 RunRootProvider = () => Path.Combine(scratch, "runs"),
                 WorkerExePath = workerExe,
-                PdfInspector = inspector ?? new StubInspector(pageCount: 1)
+                PdfInspector = inspector ?? new StubInspector(pageCount: 1),
+                NxInstallationDiscovery = new StubNxDiscovery(ReadyNxInstallation()),
+                NxSettings = new StubNxSettings()
             };
         }
 
         private ApplicationController NewController(ApplicationServices? services = null)
         {
-            return new ApplicationController(services ?? NewServices(), new NullSink());
+            var controller = new ApplicationController(services ?? NewServices(), new NullSink());
+            controller.RefreshNxStatusAsync().GetAwaiter().GetResult();
+            return controller;
         }
+
+        private static NxInstallation ReadyNxInstallation() => new(
+            @"E:\Test-NX",
+            @"E:\Test-NX\UGII\run_managed.exe",
+            @"E:\Test-NX\UGII\managed\NXOpen.dll",
+            "10.0.0.24",
+            new[] { NxCandidateSource.Registry });
 
         private static FileResult WorkerSuccess(JobItem item, string[] exportedSheets)
         {
@@ -82,47 +95,14 @@ namespace NxDrawingPdfExporter.App.Tests
             Assert.IsFalse(controller.IsBusy);
         }
 
-        private static NxInstallationDetection Detection(bool supported)
-        {
-            return new NxInstallationDetection
-            {
-                IsSupported = supported,
-                RootDirectory = supported ? NxInstallationDetector.VerifiedRoot : "",
-                LauncherPath = supported ? Path.Combine(NxInstallationDetector.VerifiedRoot, "UGII", "run_managed.exe") : "",
-                DetectedVersion = supported ? NxInstallationDetector.VerifiedFileVersion : "",
-                Message = supported ? "" : "未检测到受支持的 NX 10 安装。"
-            };
-        }
-
-        [TestMethod]
-        public void RefreshNxStatus_ReportsSupportedInstallation()
-        {
-            var services = NewServices();
-            services.NxDetectionOverride = () => Detection(supported: true);
-            var controller = NewController(services);
-
-            controller.RefreshNxStatus();
-
-            Assert.IsTrue(controller.NxStatus.IsSupported);
-        }
-
-        [TestMethod]
-        public void RefreshNxStatus_MissingInstallation_IsUnsupportedAndBlocksRun()
-        {
-            var services = NewServices();
-            services.NxDetectionOverride = () => Detection(supported: false);
-            var controller = NewController(services);
-
-            controller.RefreshNxStatus();
-
-            Assert.IsFalse(controller.NxStatus.IsSupported);
-        }
-
         [TestMethod]
         public async Task Run_MissingNxInstallation_IsRefused()
         {
             var services = NewServices();
-            services.NxDetectionOverride = () => Detection(supported: false);
+            ((StubNxDiscovery)services.NxInstallationDiscovery).Result = new NxInstallationDiscoveryResult(
+                Array.Empty<NxInstallation>(),
+                Array.Empty<NxDetectionIssue>(),
+                null);
             var controller = NewController(services);
             controller.ScanFolderPath = Path.Combine(scratch, "in");
 
@@ -130,6 +110,30 @@ namespace NxDrawingPdfExporter.App.Tests
 
             Assert.IsFalse(launcher.LaunchCalls.Any());
             Assert.IsFalse(controller.IsBusy);
+        }
+
+        [TestMethod]
+        public async Task Run_UsesSelectedCustomNxLauncher_NotV1DefaultPath()
+        {
+            var services = NewServices();
+            var customInstallation = new NxInstallation(
+                @"E:\Apps\NX10",
+                @"E:\Apps\NX10\UGII\run_managed.exe",
+                @"E:\Apps\NX10\UGII\managed\NXOpen.dll",
+                "10.0.0.24",
+                new[] { NxCandidateSource.Registry });
+            ((StubNxDiscovery)services.NxInstallationDiscovery).Result = new NxInstallationDiscoveryResult(
+                new[] { customInstallation },
+                Array.Empty<NxDetectionIssue>(),
+                customInstallation);
+            var controller = NewController(services);
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+
+            await controller.RunAsync();
+
+            Assert.AreEqual(
+                customInstallation.LauncherPath,
+                launcher.LaunchCalls.Single().NxLauncherPath);
         }
 
         [TestMethod]
@@ -331,7 +335,11 @@ namespace NxDrawingPdfExporter.App.Tests
             Assert.IsNotNull(controller.Summary);
             Assert.IsNotNull(controller.CurrentRunDirectory);
 
-            services.NxDetectionOverride = () => Detection(supported: false);
+            ((StubNxDiscovery)services.NxInstallationDiscovery).Result = new NxInstallationDiscoveryResult(
+                Array.Empty<NxInstallation>(),
+                Array.Empty<NxDetectionIssue>(),
+                null);
+            await controller.RefreshNxStatusAsync();
             await controller.RunAsync();
 
             Assert.HasCount(0, controller.Results);
@@ -567,6 +575,32 @@ namespace NxDrawingPdfExporter.App.Tests
         /// writes temp PDFs, and returns the job result the real worker would
         /// write, without launching NX.
         /// </summary>
+        private sealed class StubNxDiscovery : INxInstallationDiscoveryService
+        {
+            public StubNxDiscovery(NxInstallation installation)
+            {
+                Result = new NxInstallationDiscoveryResult(
+                    new[] { installation },
+                    Array.Empty<NxDetectionIssue>(),
+                    installation);
+            }
+
+            public NxInstallationDiscoveryResult Result { get; set; }
+
+            public Task<NxInstallationDiscoveryResult> DetectAsync(string? savedRoot, System.Threading.CancellationToken cancellationToken) =>
+                Task.FromResult(Result);
+
+            public NxInstallationDiscoveryResult ValidateManual(string rootDirectory) => Result;
+        }
+
+        private sealed class StubNxSettings : INxSettingsStore
+        {
+            public Task<NxSettingsLoadResult> LoadAsync(System.Threading.CancellationToken cancellationToken) =>
+                Task.FromResult(new NxSettingsLoadResult(new NxSettings(), NxSettingsLoadStatus.Missing));
+
+            public Task SaveAsync(NxSettings settings, System.Threading.CancellationToken cancellationToken) => Task.CompletedTask;
+        }
+
         private sealed class FakeWorkerLauncher : IWorkerProcessLauncher
         {
             public List<WorkerLaunchRequest> LaunchCalls { get; } = new List<WorkerLaunchRequest>();

@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using NxDrawingPdfExporter.App.Configuration;
 using NxDrawingPdfExporter.App.Logging;
 using NxDrawingPdfExporter.App.Runtime;
+using NxDrawingPdfExporter.App.Runtime.Detection;
 using NxDrawingPdfExporter.Contracts;
 using NxDrawingPdfExporter.Core.Input;
 using NxDrawingPdfExporter.Core.Jobs;
@@ -32,14 +35,24 @@ namespace NxDrawingPdfExporter.App
 
         public IFileReplacer FileReplacer { get; init; } = new FileReplacer();
 
+        public INxInstallationDiscoveryService NxInstallationDiscovery { get; init; } =
+            new NxInstallationDiscoveryService(
+                new INxInstallationCandidateSource[]
+                {
+                    new RegistryNxCandidateSource(),
+                    new InstalledApplicationNxCandidateSource(),
+                    new EnvironmentNxCandidateSource(),
+                },
+                new NxInstallationValidator());
+
+        public INxSettingsStore NxSettings { get; init; } = JsonNxSettingsStore.CreateDefault();
+
         /// <summary>运行目录根；默认 %LOCALAPPDATA%\NxDrawingPdfExporter\runs。</summary>
         public Func<string>? RunRootProvider { get; init; }
 
         /// <summary>Worker 程序路径；默认相对程序目录的 worker\NxDrawingPdfExporter.Worker.exe。</summary>
         public string? WorkerExePath { get; init; }
 
-        /// <summary>NX 检测替换点；默认对已验证本机路径做 fail-closed 检测。</summary>
-        public Func<NxInstallationDetection>? NxDetectionOverride { get; set; }
     }
 
     /// <summary>
@@ -50,13 +63,14 @@ namespace NxDrawingPdfExporter.App
     {
         private readonly ApplicationServices services;
         private readonly ILogSink log;
-        private readonly NxInstallationDetector detector = new();
+        private readonly ILogSink nxDiagnosticLog;
         private string? cancellationFlagPath;
 
-        public ApplicationController(ApplicationServices services, ILogSink log)
+        public ApplicationController(ApplicationServices services, ILogSink log, ILogSink? nxDiagnosticLog = null)
         {
             this.services = services ?? throw new ArgumentNullException(nameof(services));
             this.log = log ?? throw new ArgumentNullException(nameof(log));
+            this.nxDiagnosticLog = nxDiagnosticLog ?? log;
         }
 
         // ---- 用户可选状态（默认值来自批准的设计） ----
@@ -75,7 +89,14 @@ namespace NxDrawingPdfExporter.App
         public ExistingPdfPolicy ExistingPdfPolicy { get; set; } = ExistingPdfPolicy.Skip;
 
         // ---- 运行时状态 ----
-        public NxInstallationDetection NxStatus { get; private set; } = new();
+        public NxInstallationDiscoveryResult NxDiscovery { get; private set; } =
+            new(Array.Empty<NxInstallation>(), Array.Empty<NxDetectionIssue>(), null);
+
+        public NxInstallation? SelectedNx => NxDiscovery.SelectedInstallation;
+
+        public bool IsNxDetectionBusy { get; private set; }
+
+        public string NxStatusMessage { get; private set; } = "尚未检测 NX。";
 
         public bool IsBusy { get; private set; }
 
@@ -93,13 +114,127 @@ namespace NxDrawingPdfExporter.App
 
         private void Raise() => StateChanged?.Invoke();
 
-        public void RefreshNxStatus()
+        public async Task RefreshNxStatusAsync(CancellationToken cancellationToken = default)
         {
-            NxStatus = services.NxDetectionOverride?.Invoke() ?? detector.Detect();
-            log.Write("NX 检测: " + (NxStatus.IsSupported
-                ? "受支持版本 " + NxStatus.DetectedVersion
-                : NxStatus.Message));
+            if (IsBusy || IsNxDetectionBusy)
+            {
+                throw new InvalidOperationException("运行期间不能重新检测 NX。");
+            }
+
+            IsNxDetectionBusy = true;
+            NxStatusMessage = "正在检测 NX…";
             Raise();
+            try
+            {
+                NxSettingsLoadResult settings = await services.NxSettings.LoadAsync(cancellationToken);
+                NxDiscovery = await services.NxInstallationDiscovery.DetectAsync(
+                    settings.Settings.NxRootDirectory,
+                    cancellationToken);
+                NxStatusMessage = FormatNxStatus(NxDiscovery, settings.Status);
+                if (SelectedNx is { } selected)
+                    await SaveSelectedNxAsync(selected, cancellationToken);
+                LogNxIssues(NxDiscovery.Issues);
+            }
+            finally
+            {
+                IsNxDetectionBusy = false;
+                Raise();
+            }
+        }
+
+        public async Task SelectDetectedNxAsync(string rootDirectory, CancellationToken cancellationToken = default)
+        {
+            if (IsBusy || IsNxDetectionBusy)
+            {
+                throw new InvalidOperationException("当前不能切换 NX 安装。 ");
+            }
+
+            NxInstallation? selected = NxDiscovery.Installations.FirstOrDefault(installation =>
+                string.Equals(installation.RootDirectory, rootDirectory, StringComparison.OrdinalIgnoreCase));
+            if (selected is null)
+            {
+                throw new ArgumentException("所选 NX 安装不在当前检测结果中。", nameof(rootDirectory));
+            }
+
+            IsNxDetectionBusy = true;
+            Raise();
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                NxDiscovery = NxDiscovery with { SelectedInstallation = selected };
+                NxStatusMessage = FormatNxStatus(NxDiscovery, NxSettingsLoadStatus.Loaded);
+                await SaveSelectedNxAsync(selected, cancellationToken);
+            }
+            finally
+            {
+                IsNxDetectionBusy = false;
+                Raise();
+            }
+        }
+
+        public async Task SelectManualNxAsync(string rootDirectory, CancellationToken cancellationToken = default)
+        {
+            if (IsBusy || IsNxDetectionBusy)
+            {
+                throw new InvalidOperationException("当前不能切换 NX 安装。");
+            }
+
+            IsNxDetectionBusy = true;
+            Raise();
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                NxInstallationDiscoveryResult validated = services.NxInstallationDiscovery.ValidateManual(rootDirectory);
+                if (validated.SelectedInstallation is null)
+                {
+                    NxStatusMessage = string.Join(" ", validated.Issues.Select(issue => issue.UserMessage));
+                    if (string.IsNullOrWhiteSpace(NxStatusMessage))
+                        NxStatusMessage = "手动选择的目录不是受支持的 NX 10.0.0.24 安装。";
+                    LogNxIssues(validated.Issues);
+                    return;
+                }
+
+                NxDiscovery = validated;
+                NxStatusMessage = FormatNxStatus(NxDiscovery, NxSettingsLoadStatus.Loaded);
+                await SaveSelectedNxAsync(validated.SelectedInstallation, cancellationToken);
+                LogNxIssues(validated.Issues);
+            }
+            finally
+            {
+                IsNxDetectionBusy = false;
+                Raise();
+            }
+        }
+
+        private void LogNxIssues(IReadOnlyList<NxDetectionIssue> issues)
+        {
+            try
+            {
+                foreach (NxDetectionIssue issue in issues)
+                    nxDiagnosticLog.Write($"NX detection: code={issue.Code}; source={issue.Source}; exception={issue.Diagnostic}");
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                NxStatusMessage += " 无法保存 NX 检测诊断，请保留当前状态截图。";
+            }
+        }
+
+        private async Task SaveSelectedNxAsync(NxInstallation selected, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await services.NxSettings.SaveAsync(new NxSettings(1, selected.RootDirectory), cancellationToken);
+            }
+            catch (IOException)
+            {
+                NxStatusMessage = "NX 已选定，但无法保存下次启动设置。";
+                Raise();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                NxStatusMessage = "NX 已选定，但无法保存下次启动设置。";
+                Raise();
+            }
         }
 
         /// <summary>输出预检查列表，供 GUI 预检查网格显示；不执行任何导出。</summary>
@@ -120,9 +255,19 @@ namespace NxDrawingPdfExporter.App
 
         public async Task RunAsync()
         {
-            if (IsBusy)
+            if (IsBusy || IsNxDetectionBusy)
             {
                 throw new InvalidOperationException("已有任务正在运行。");
+            }
+
+            if (SelectedNx is { } selected
+                && services.NxInstallationDiscovery.ValidateManual(selected.RootDirectory).SelectedInstallation is null)
+            {
+                NxDiscovery = new(Array.Empty<NxInstallation>(), Array.Empty<NxDetectionIssue>(), null);
+                await RefreshNxStatusAsync();
+                ProgressText = "原 NX 安装已失效，已重新检测；请确认后重新开始。";
+                Raise();
+                return;
             }
 
             IsBusy = true;
@@ -162,12 +307,14 @@ namespace NxDrawingPdfExporter.App
 
         private async Task RunCore()
         {
-            RefreshNxStatus();
-            if (!NxStatus.IsSupported)
+            NxInstallation? selectedNx = SelectedNx;
+            if (selectedNx is null)
             {
-                ProgressText = NxStatus.Message;
+                ProgressText = "没有经过验证的 NX 10.0.0.24，无法开始导出。";
                 return;
             }
+
+            string launcherPathForRun = selectedNx.LauncherPath;
 
             var sources = CollectSources();
             if (sources.Count == 0)
@@ -268,7 +415,7 @@ namespace NxDrawingPdfExporter.App
             {
                 launch = await Task.Run(() => services.WorkerLauncher.Launch(new WorkerLaunchRequest
                 {
-                    NxLauncherPath = NxStatus.LauncherPath,
+                    NxLauncherPath = launcherPathForRun,
                     WorkerExePath = workerExePath,
                     JobPath = jobPath,
                     RunDirectory = runDirectory
@@ -531,6 +678,24 @@ namespace NxDrawingPdfExporter.App
             return string.IsNullOrWhiteSpace(message)
                 ? "未知错误"
                 : message.Replace("\r", " ").Replace("\n", " ").Trim();
+        }
+
+        private static string FormatNxStatus(NxInstallationDiscoveryResult discovery, NxSettingsLoadStatus settingsStatus)
+        {
+            if (discovery.IsReady)
+            {
+                return $"NX {discovery.SelectedInstallation!.DetectedVersion} 已就绪：{discovery.SelectedInstallation.RootDirectory}";
+            }
+
+            if (discovery.RequiresSelection)
+            {
+                return "检测到多个受支持的 NX 安装，请选择后继续。";
+            }
+
+            string detail = string.Join(" ", discovery.Issues.Select(issue => issue.UserMessage).Distinct());
+            return (settingsStatus == NxSettingsLoadStatus.InvalidJson || settingsStatus == NxSettingsLoadStatus.UnsupportedSchema
+                ? "已忽略无效的 NX 保存设置，未检测到受支持的 NX 10.0.0.24。"
+                : "未检测到受支持的 NX 10.0.0.24。") + " " + detail + " 可手动选择包含 UGII 的 NX 根目录。";
         }
     }
 }

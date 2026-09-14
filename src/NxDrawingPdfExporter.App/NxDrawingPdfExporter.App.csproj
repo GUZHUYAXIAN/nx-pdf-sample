@@ -26,4 +26,8 @@
     <ProjectReference Include="..\NxDrawingPdfExporter.Core\NxDrawingPdfExporter.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="NxDrawingPdfExporter.App.Tests" />
+  </ItemGroup>
+
 </Project>

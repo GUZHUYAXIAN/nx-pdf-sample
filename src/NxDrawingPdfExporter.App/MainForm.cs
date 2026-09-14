@@ -6,11 +6,18 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using NxDrawingPdfExporter.App.Logging;
 using NxDrawingPdfExporter.App.Runtime;
+using NxDrawingPdfExporter.App.Runtime.Detection;
 using NxDrawingPdfExporter.Contracts;
 using NxDrawingPdfExporter.Core.Output;
 
 namespace NxDrawingPdfExporter.App
 {
+    internal sealed record MainFormNxViewState(
+        string StatusText,
+        bool ShowCandidateList,
+        bool EnableNxActions,
+        bool EnableStart);
+
     /// <summary>
     /// 单窗口 UI：控制器状态的薄绑定层，不含业务规则。
     /// 运行中关闭窗口走安全停止流程，绝不粗暴终止正在替换 PDF 的 Worker。
@@ -23,11 +30,10 @@ namespace NxDrawingPdfExporter.App
         public MainForm()
         {
             InitializeComponent();
-            controller = new ApplicationController(new ApplicationServices(), new StartupLogSink());
+            controller = new ApplicationController(new ApplicationServices(), new StartupLogSink(), new NxDetectionLog());
             BindController();
             BindEvents();
             UpdateDynamicState();
-            controller.RefreshNxStatus();
         }
 
         private void BindController()
@@ -45,8 +51,43 @@ namespace NxDrawingPdfExporter.App
             };
         }
 
+        internal static MainFormNxViewState BuildNxViewState(ApplicationController controller)
+        {
+            ArgumentNullException.ThrowIfNull(controller);
+            return new MainFormNxViewState(
+                controller.NxStatusMessage,
+                controller.NxDiscovery.Installations.Count > 1,
+                !controller.IsBusy && !controller.IsNxDetectionBusy,
+                !controller.IsBusy && !controller.IsNxDetectionBusy && controller.SelectedNx is not null);
+        }
+
+        internal static NxInstallation? ChooseNxCandidate(NxInstallationDiscoveryResult discovery, string? highlightedRoot) =>
+            discovery.Installations.FirstOrDefault(installation => string.Equals(
+                installation.RootDirectory, highlightedRoot, StringComparison.OrdinalIgnoreCase))
+            ?? discovery.SelectedInstallation
+            ?? discovery.Installations.FirstOrDefault();
+
+        internal static string FormatNxCandidate(NxInstallation installation) =>
+            $"{installation.RootDirectory} — NX {installation.DetectedVersion}";
+
         private void BindEvents()
         {
+            comboNxInstallations.FormattingEnabled = true;
+            comboNxInstallations.Format += (_, args) =>
+            {
+                if (args.ListItem is NxInstallation installation)
+                    args.Value = FormatNxCandidate(installation);
+            };
+            Shown += async (_, _) => await RefreshNxAsync();
+            buttonRefreshNx.Click += async (_, _) => await RefreshNxAsync();
+            buttonSelectNx.Click += async (_, _) =>
+            {
+                if (comboNxInstallations.SelectedItem is NxInstallation selected)
+                {
+                    await PerformNxActionAsync(() => controller.SelectDetectedNxAsync(selected.RootDirectory));
+                }
+            };
+            buttonBrowseNx.Click += async (_, _) => await BrowseNxAsync();
             radioScanFolder.CheckedChanged += (_, _) => { if (radioScanFolder.Checked) { controller.InputMode = GuiInputMode.ScanFolder; UpdateDynamicState(); } };
             radioManual.CheckedChanged += (_, _) => { if (radioManual.Checked) { controller.InputMode = GuiInputMode.ManualSelection; UpdateDynamicState(); } };
             buttonBrowseScan.Click += (_, _) =>
@@ -110,6 +151,36 @@ namespace NxDrawingPdfExporter.App
             buttonCancelRun.Click += (_, _) => controller.Cancel();
             buttonOpenOutput.Click += (_, _) => OpenOutputDirectory();
             buttonOpenLog.Click += (_, _) => OpenLog();
+        }
+
+        private async Task RefreshNxAsync()
+            => await PerformNxActionAsync(() => controller.RefreshNxStatusAsync());
+
+        private async Task PerformNxActionAsync(Func<Task> action)
+        {
+            try
+            {
+                await action();
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception error)
+            {
+                MessageBox.Show(this, "NX 操作未完成，请重新检测（" + error.GetType().Name + "）。", "NX 检测失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private async Task BrowseNxAsync()
+        {
+            using var dialog = new FolderBrowserDialog
+            {
+                Description = "请选择包含 UGII 文件夹的 NX 10.0 根目录"
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            await PerformNxActionAsync(() => controller.SelectManualNxAsync(dialog.SelectedPath));
         }
 
         private void StartRun()
@@ -232,11 +303,31 @@ namespace NxDrawingPdfExporter.App
 
         private void UpdateDynamicState()
         {
-            if (controller.NxStatus is { } nx)
+            MainFormNxViewState nxState = BuildNxViewState(controller);
+            labelNxStatus.Text = nxState.StatusText;
+            comboNxInstallations.Visible = nxState.ShowCandidateList;
+            buttonSelectNx.Visible = nxState.ShowCandidateList;
+            buttonRefreshNx.Enabled = nxState.EnableNxActions;
+            buttonBrowseNx.Enabled = nxState.EnableNxActions;
+            buttonSelectNx.Enabled = nxState.EnableNxActions;
+            comboNxInstallations.Enabled = nxState.EnableNxActions;
+            groupInput.Enabled = nxState.EnableNxActions;
+            groupOutput.Enabled = nxState.EnableNxActions;
+            groupPolicy.Enabled = nxState.EnableNxActions;
+            if (nxState.ShowCandidateList)
             {
-                labelNxStatus.Text = nx.IsSupported
-                    ? $"NX 10 已就绪：{nx.RootDirectory}（{nx.DetectedVersion}）"
-                    : "NX 不可用：" + nx.Message;
+                NxInstallation? highlighted = ChooseNxCandidate(controller.NxDiscovery,
+                    (comboNxInstallations.SelectedItem as NxInstallation)?.RootDirectory);
+                comboNxInstallations.Items.Clear();
+                foreach (NxInstallation installation in controller.NxDiscovery.Installations)
+                {
+                    comboNxInstallations.Items.Add(installation);
+                }
+                comboNxInstallations.SelectedItem = highlighted;
+            }
+            else
+            {
+                comboNxInstallations.Items.Clear();
             }
 
             panelScan.Enabled = controller.InputMode == GuiInputMode.ScanFolder;
@@ -252,7 +343,7 @@ namespace NxDrawingPdfExporter.App
 
             labelProgress.Text = controller.ProgressText;
             labelSummary.Text = controller.SummaryText;
-            buttonStart.Enabled = !controller.IsBusy;
+            buttonStart.Enabled = nxState.EnableStart;
             buttonCancelRun.Enabled = controller.IsBusy;
             buttonPreflight.Enabled = !controller.IsBusy;
             progressBar.Style = controller.IsBusy ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;

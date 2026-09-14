@@ -1,5 +1,18 @@
 # Known Limitations (V1)
 
+## V2 checkpoint — 2026-09-14
+
+The numbered V1 record below is historical, not evidence for V2. The V2 candidate
+removes the developer-root fallback and passes automated tests, but its live NX,
+100/125/150% DPI, physical-offline and colleague-path checks have no reviewed evidence.
+The user now permits proceeding without waiting for those checks: USER-WAIVED /
+UNVERIFIED, not an observed PASS. EV-04/EV-05 remain unverified; no
+remote Issue was read or changed this turn. See `../v2/README.md` for the current
+matrix. The r2 candidate aligns multiple-candidate visibility with design 7.1;
+actual display acceptance remains pending. No other NX version is supported.
+
+## Preserved V1 limitations
+
 1. **NX version and machine scope.** Only Windows 11 x64 with Siemens NX
    10.0.0.24 at the verified install root (`D:\Program Files\Siemens\NX
    10.0`) is supported. The GUI fails closed for any other version or

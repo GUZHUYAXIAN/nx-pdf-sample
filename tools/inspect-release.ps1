@@ -111,8 +111,8 @@ foreach ($file in $files) {
 #
 # Path policy (reviewed, see docs/verification/release/README.md):
 #   * Forbidden outright: the developer checkout (E:\Codex), the offline
-#     toolchain project (nx-step-launcher), any Program Files path other
-#     than the approved NX root, and user-profile drive paths.
+#     toolchain project (nx-step-launcher), the historical fixed NX root,
+#     and user-profile drive paths. NX installation roots have no exemption.
 #   * Generic build/source paths (containing \src\, \obj\, .cs/.cpp/.pdb…)
 #     must match a REVIEWED upstream prefix: Microsoft's official .NET
 #     runtime CI root (D:\a\_work\, inherent to the official runtime pack)
@@ -122,11 +122,10 @@ foreach ($file in $files) {
 #   * Binary noise that merely resembles "X:\..." without source/build
 #     indicators is not treated as a path.
 $approvedPathPrefixes = @(
-    'D:\Program Files\Siemens\NX 10.0',
     'D:\a\_work\',
     'D:\repos\empira\'
 )
-$forbiddenLiterals = @('E:\Codex', 'D:\Program Files', 'nx-step-launcher')
+$forbiddenLiterals = @('E:\Codex', 'D:\Program Files\Siemens\NX 10.0', 'nx-step-launcher')
 $sourcePathCandidate = [regex]'[A-Za-z]:\\[^\x00-\x08\x0b\x0c\x0e-\x1f"<>|*?]{6,140}'
 $sourcePathIndicator = [regex]'\\(src|source|obj)\\|\.(cs|cpp|hpp|pdb|vb|rs)([^A-Za-z0-9_]|$)'
 foreach ($file in $files) {
