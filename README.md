@@ -43,6 +43,14 @@ V2 不内置开发机 NX 安装路径。自动发现读取已保存配置、注�
 
 私有样例位于 `samples/private/`，已被 Git 忽略。制图 PRT、关联模型和参考 PDF 必须继续保存在同一目录，不得提交、重命名或对外发布。
 
+## 许可证
+
+本项目自有源码和文档采用 [MIT 许可证](LICENSE)。第三方组件仍遵循各自许可证，
+详见 [第三方声明](THIRD-PARTY-NOTICES.txt)。Siemens NX、NXOpen 程序集和私有样例
+不包含在本项目的 MIT 授权或公开分发范围内；使用工具仍需自行具备合法可用的 NX 环境。
+
+源码开源不代表 V2 已完成全部真机验收；当前候选版状态和未核验证据见上方“当前状态”。
+
 ## 设计文档
 
 - `docs/superpowers/specs/2026-08-26-nx-drawing-pdf-exporter-design.md`
