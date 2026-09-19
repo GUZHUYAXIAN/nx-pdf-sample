@@ -23,7 +23,7 @@ $taskDotnet = if ($DotnetPath) { (Resolve-Path -LiteralPath $DotnetPath).Path } 
 if ($ReleaseVersion) {
     if ($ReleaseVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'ReleaseVersion must be a three-part numeric version.' }
     [xml]$props = Get-Content -LiteralPath (Join-Path $repoRoot 'Directory.Build.props') -Raw
-    if ([string]$props.Project.PropertyGroup.Version -ne $ReleaseVersion) { throw 'ReleaseVersion differs from Directory.Build.props.' }
+    if ($props.SelectSingleNode('/Project/PropertyGroup/Version').InnerText -ne $ReleaseVersion) { throw 'ReleaseVersion differs from Directory.Build.props.' }
 }
 if (-not $env:DOTNET_CLI_HOME) { $env:DOTNET_CLI_HOME = Join-Path $repoRoot '.tools\dotnet-cli-home' }
 $env:DOTNET_GENERATE_ASPNET_CERTIFICATE = 'false'
