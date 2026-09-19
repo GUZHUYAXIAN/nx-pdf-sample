@@ -65,47 +65,41 @@ public sealed class NxInstallationValidator
                     candidate.Source));
             }
 
-            string launcherPath = Path.Combine(rootDirectory, "UGII", "run_managed.exe");
+            // Inspect layouts without guessing from the root folder's name.
+            var profiles = NxRuntimeProfile.Supported.Where(p =>
+                Directory.Exists(Path.Combine(rootDirectory, p.BinDirectoryName, "managed"))).ToArray();
+            if (profiles.Length == 0) profiles = new[] { NxRuntimeProfile.Nx10 };
+            if (profiles.Length > 1)
+                return ValidationAttempt.FromIssue(Issue(NxDetectionIssueCode.UnsupportedVersion,
+                    "安装目录同时含有两代 managed 布局，无法确认组件来源，请选择独立的 NX 根目录。", candidate.Source));
+            NxRuntimeProfile profile = profiles[0];
+            string launcherPath = Path.Combine(rootDirectory, profile.BinDirectoryName, profile.LauncherName);
             if (!File.Exists(launcherPath))
-            {
-                return ValidationAttempt.FromIssue(Issue(
-                    NxDetectionIssueCode.LauncherMissing,
-                    "NX 目录中缺少 UGII\\run_managed.exe。",
-                    candidate.Source));
-            }
+                return ValidationAttempt.FromIssue(Issue(NxDetectionIssueCode.LauncherMissing,
+                    $"{profile.Label} 目录中缺少 {profile.BinDirectoryName}\\{profile.LauncherName}。", candidate.Source));
 
-            string nxOpenPath = Path.Combine(rootDirectory, "UGII", "managed", "NXOpen.dll");
-            if (!File.Exists(nxOpenPath))
+            string managed = Path.Combine(rootDirectory, profile.BinDirectoryName, "managed");
+            string[] names = { "NXOpen.dll", "NXOpen.UF.dll", "NXOpen.Utilities.dll" };
+            string[] expected = { profile.NxOpenVersion, profile.UfVersion, profile.UtilitiesVersion };
+            var versions = new string[3];
+            for (int i = 0; i < names.Length; i++)
             {
-                return ValidationAttempt.FromIssue(Issue(
-                    NxDetectionIssueCode.NxOpenMissing,
-                    "NX 目录中缺少 UGII\\managed\\NXOpen.dll。",
-                    candidate.Source));
+                string path = Path.Combine(managed, names[i]);
+                if (!File.Exists(path))
+                    return ValidationAttempt.FromIssue(Issue(NxDetectionIssueCode.NxOpenMissing,
+                        $"{profile.Label} 安装缺少 {names[i]}，请检查安装完整性。", candidate.Source));
+                string? version = fileVersionReader(path);
+                if (string.IsNullOrWhiteSpace(version))
+                    return ValidationAttempt.FromIssue(Issue(NxDetectionIssueCode.VersionUnreadable,
+                        $"无法读取 {names[i]} 的文件版本。", candidate.Source));
+                if (!string.Equals(version, expected[i], StringComparison.Ordinal))
+                    return ValidationAttempt.FromIssue(Issue(NxDetectionIssueCode.UnsupportedVersion,
+                        $"{profile.Label} 的 {names[i]} 版本不受支持（要求 {expected[i]}）。当前支持 NX 10.0.0.24 和已验证的 NX 2506 组件组合；不支持混搭或未知补丁。", candidate.Source));
+                versions[i] = version;
             }
-
-            string? version = fileVersionReader(nxOpenPath);
-            if (string.IsNullOrWhiteSpace(version))
-            {
-                return ValidationAttempt.FromIssue(Issue(
-                    NxDetectionIssueCode.VersionUnreadable,
-                    "无法读取 NXOpen.dll 的文件版本。",
-                    candidate.Source));
-            }
-
-            if (!string.Equals(version, SupportedNxOpenFileVersion, StringComparison.Ordinal))
-            {
-                return ValidationAttempt.FromIssue(Issue(
-                    NxDetectionIssueCode.UnsupportedVersion,
-                    $"检测到不受支持的 NX 版本；本工具仅支持 NX {SupportedNxOpenFileVersion}。",
-                    candidate.Source));
-            }
-
-            return ValidationAttempt.FromInstallation(new NxInstallation(
-                rootDirectory,
-                launcherPath,
-                nxOpenPath,
-                version,
-                new[] { candidate.Source }));
+            return ValidationAttempt.FromInstallation(new NxInstallation(rootDirectory, launcherPath,
+                Path.Combine(managed, names[0]), versions[0], new[] { candidate.Source })
+            { Profile = profile, UfVersion = versions[1], UtilitiesVersion = versions[2] });
         }
         catch (Exception error) when (IsExpectedPathOrVersionError(error))
         {
@@ -153,9 +147,11 @@ public sealed class NxInstallationValidator
     private sealed class MutableInstallation
     {
         private readonly List<NxCandidateSource> sources;
+        private readonly NxInstallation installation;
 
         private MutableInstallation(NxInstallation installation)
         {
+            this.installation = installation;
             RootDirectory = installation.RootDirectory;
             LauncherPath = installation.LauncherPath;
             NxOpenPath = installation.NxOpenPath;
@@ -181,11 +177,6 @@ public sealed class NxInstallationValidator
             }
         }
 
-        public NxInstallation ToImmutable() => new(
-            RootDirectory,
-            LauncherPath,
-            NxOpenPath,
-            DetectedVersion,
-            sources.ToArray());
+        public NxInstallation ToImmutable() => installation with { Sources = sources.ToArray() };
     }
 }

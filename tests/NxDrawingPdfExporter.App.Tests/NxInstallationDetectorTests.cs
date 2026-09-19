@@ -28,7 +28,7 @@ public sealed class NxInstallationDetectorTests
     public void ValidateAndDeduplicate_ValidCustomRoots_MergeSourcesCaseInsensitively()
     {
         string root = CreateNxLayout("西门子 NX 10");
-        var sut = new NxInstallationValidator(_ => "10.0.0.24");
+        var sut = new NxInstallationValidator(path => Path.GetFileName(path) switch { "NXOpen.UF.dll" => "10.0.0.23", "NXOpen.Utilities.dll" => "4.0.0.0", _ => "10.0.0.24" });
 
         NxInstallationDiscoveryResult result = sut.ValidateAndDeduplicate(new[]
         {
@@ -48,7 +48,7 @@ public sealed class NxInstallationDetectorTests
     public void ValidateAndDeduplicate_MissingRoot_ReportsRootMissing()
     {
         string missingRoot = Path.Combine(CreateScratchDirectory(), "missing NX");
-        var sut = new NxInstallationValidator(_ => "10.0.0.24");
+        var sut = new NxInstallationValidator(path => Path.GetFileName(path) switch { "NXOpen.UF.dll" => "10.0.0.23", "NXOpen.Utilities.dll" => "4.0.0.0", _ => "10.0.0.24" });
 
         NxInstallationDiscoveryResult result = sut.ValidateAndDeduplicate(
             new[] { new NxInstallationCandidate(missingRoot, NxCandidateSource.Manual) });
@@ -64,7 +64,9 @@ public sealed class NxInstallationDetectorTests
         string root = CreateScratchDirectory();
         Directory.CreateDirectory(Path.Combine(root, "UGII", "managed"));
         File.WriteAllBytes(Path.Combine(root, "UGII", "managed", "NXOpen.dll"), Array.Empty<byte>());
-        var sut = new NxInstallationValidator(_ => "10.0.0.24");
+        File.WriteAllBytes(Path.Combine(root, "UGII", "managed", "NXOpen.UF.dll"), Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(root, "UGII", "managed", "NXOpen.Utilities.dll"), Array.Empty<byte>());
+        var sut = new NxInstallationValidator(path => Path.GetFileName(path) switch { "NXOpen.UF.dll" => "10.0.0.23", "NXOpen.Utilities.dll" => "4.0.0.0", _ => "10.0.0.24" });
 
         NxInstallationDiscoveryResult result = sut.ValidateAndDeduplicate(
             new[] { new NxInstallationCandidate(root, NxCandidateSource.Manual) });
@@ -78,7 +80,7 @@ public sealed class NxInstallationDetectorTests
         string root = CreateScratchDirectory();
         Directory.CreateDirectory(Path.Combine(root, "UGII"));
         File.WriteAllBytes(Path.Combine(root, "UGII", "run_managed.exe"), Array.Empty<byte>());
-        var sut = new NxInstallationValidator(_ => "10.0.0.24");
+        var sut = new NxInstallationValidator(path => Path.GetFileName(path) switch { "NXOpen.UF.dll" => "10.0.0.23", "NXOpen.Utilities.dll" => "4.0.0.0", _ => "10.0.0.24" });
 
         NxInstallationDiscoveryResult result = sut.ValidateAndDeduplicate(
             new[] { new NxInstallationCandidate(root, NxCandidateSource.Manual) });
@@ -117,7 +119,7 @@ public sealed class NxInstallationDetectorTests
     public void ValidateAndDeduplicate_QuotedTrailingPathWithSpaces_IsNormalized()
     {
         string root = CreateNxLayout("NX with spaces");
-        var sut = new NxInstallationValidator(_ => "10.0.0.24");
+        var sut = new NxInstallationValidator(path => Path.GetFileName(path) switch { "NXOpen.UF.dll" => "10.0.0.23", "NXOpen.Utilities.dll" => "4.0.0.0", _ => "10.0.0.24" });
 
         NxInstallationDiscoveryResult result = sut.ValidateAndDeduplicate(new[]
         {
@@ -132,7 +134,7 @@ public sealed class NxInstallationDetectorTests
     public void ValidateAndDeduplicate_LongChineseRoot_IsAccepted()
     {
         string root = CreateNxLayout(string.Join("-", Enumerable.Repeat("长路径西门子", 12)));
-        var sut = new NxInstallationValidator(_ => "10.0.0.24");
+        var sut = new NxInstallationValidator(path => Path.GetFileName(path) switch { "NXOpen.UF.dll" => "10.0.0.23", "NXOpen.Utilities.dll" => "4.0.0.0", _ => "10.0.0.24" });
 
         NxInstallationDiscoveryResult result = sut.ValidateAndDeduplicate(
             new[] { new NxInstallationCandidate(root, NxCandidateSource.Manual) });
@@ -148,6 +150,8 @@ public sealed class NxInstallationDetectorTests
         Directory.CreateDirectory(Path.Combine(ugii, "managed"));
         File.WriteAllBytes(Path.Combine(ugii, "run_managed.exe"), Array.Empty<byte>());
         File.WriteAllBytes(Path.Combine(ugii, "managed", "NXOpen.dll"), Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(ugii, "managed", "NXOpen.UF.dll"), Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(ugii, "managed", "NXOpen.Utilities.dll"), Array.Empty<byte>());
         return root;
     }
 

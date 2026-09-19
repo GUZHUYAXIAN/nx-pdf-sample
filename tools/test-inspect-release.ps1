@@ -47,6 +47,11 @@ try {
     if ($fixedNxExit -eq 0) { throw 'V2 检查失败：固定 NX 根目录未被拒绝。' }
     Write-Host 'PASS：固定 NX 根目录被拒绝。'
 
+    $modernNxPackage = Join-Path $fixtureRoot 'modern-nx-root'
+    New-Item -ItemType Directory -Path $modernNxPackage | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $modernNxPackage 'app.dll'), [Text.Encoding]::Unicode.GetBytes('D:\Program Files\Siemens\NX2506'))
+    $modernNxExit = Invoke-Inspector -Package $modernNxPackage -Manifest (Join-Path $fixtureRoot 'modern-nx.sha256')
+    if ($modernNxExit -eq 0) { throw 'NX2506 fixed-root literal was not rejected.' }
     Write-Host '=== 自测 2：干净包 + 中文/空格文件名的 UTF-8 清单回环 ==='
     $cleanPackage = Join-Path $fixtureRoot 'clean'
     New-Item -ItemType Directory -Path $cleanPackage | Out-Null

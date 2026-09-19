@@ -26,8 +26,16 @@ namespace NxDrawingPdfExporter.Worker
 
             foreach (var sheet in sheets)
             {
-                sheet.Open();
-                workPart.DraftingViews.UpdateViews(DraftingViewCollection.ViewUpdateOption.OutOfDate, sheet);
+                try
+                {
+                    sheet.Open();
+                    workPart.DraftingViews.UpdateViews(DraftingViewCollection.ViewUpdateOption.OutOfDate, sheet);
+                }
+                catch (NXException error)
+                {
+                    throw new InvalidOperationException("制图视图更新失败（错误代码 " + error.ErrorCode
+                        + "）。请检查关联模型和视图更新状态；该文件不会按模板页跳过。", error);
+                }
             }
         }
     }

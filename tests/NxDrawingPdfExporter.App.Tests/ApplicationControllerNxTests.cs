@@ -15,6 +15,34 @@ namespace NxDrawingPdfExporter.App.Tests;
 public sealed class ApplicationControllerNxTests
 {
     [TestMethod]
+    public async Task ManualSelection_RetainsOtherDetectedVersionForSwitching()
+    {
+        var old = Ready(@"E:\NX10", @"E:\NX10\UGII\run_managed.exe");
+        var modern = Ready(@"E:\NX2506", @"E:\NX2506\NXBIN\run_dotnet_nxopen.exe") with { Profile = NxRuntimeProfile.Nx2506 };
+        var discovery = new StubDiscovery(new(new[] { old, modern }, Array.Empty<NxDetectionIssue>(), old))
+            { ManualResult = ReadyResult(modern) };
+        var controller = NewController(discovery, new StubSettings());
+        await controller.RefreshNxStatusAsync();
+        await controller.SelectManualNxAsync(modern.RootDirectory);
+        Assert.HasCount(2, controller.NxDiscovery.Installations);
+        Assert.AreEqual(modern, controller.SelectedNx);
+        Assert.IsTrue(MainForm.BuildNxViewState(controller).ShowCandidateList);
+    }
+
+    [TestMethod]
+    public async Task Run_RevalidatedProfileChangedAtSameRoot_StopsBeforeJobCreation()
+    {
+        var old = Ready(@"E:\NX", @"E:\NX\UGII\run_managed.exe");
+        var discovery = new StubDiscovery(ReadyResult(old));
+        var controller = NewController(discovery, new StubSettings());
+        await controller.RefreshNxStatusAsync();
+        discovery.ManualResult = ReadyResult(old with { Profile = NxRuntimeProfile.Nx2506 });
+        await controller.RunAsync();
+        StringAssert.Contains(controller.ProgressText, "已重新检测");
+        Assert.IsNull(controller.CurrentRunDirectory);
+    }
+
+    [TestMethod]
     public async Task Detection_LogWriteFailure_KeepsSelectionAndShowsWarning()
     {
         var installation = Ready(@"E:\NX", @"E:\NX\UGII\run_managed.exe");

@@ -7,10 +7,10 @@
   -->
 
   <PropertyGroup>
-    <!-- V2 implementation candidate; release status remains evidence-gated. -->
-    <Version>2.0.0</Version>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
+    <!-- Dual-NX maintenance release; validation scope is documented separately. -->
+    <Version>2.0.1</Version>
+    <AssemblyVersion>2.0.1.0</AssemblyVersion>
+    <FileVersion>2.0.1.0</FileVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latestMajor</LangVersion>

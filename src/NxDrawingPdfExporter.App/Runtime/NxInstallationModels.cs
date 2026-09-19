@@ -30,7 +30,13 @@ public sealed record NxInstallation(
     string LauncherPath,
     string NxOpenPath,
     string DetectedVersion,
-    IReadOnlyList<NxCandidateSource> Sources);
+    IReadOnlyList<NxCandidateSource> Sources)
+{
+    public NxRuntimeProfile Profile { get; init; } = NxRuntimeProfile.Nx10;
+    public string UfVersion { get; init; } = "";
+    public string UtilitiesVersion { get; init; } = "";
+    public string ManagedDirectory => Path.GetDirectoryName(NxOpenPath)!;
+}
 
 public sealed record NxDetectionIssue(
     NxDetectionIssueCode Code,

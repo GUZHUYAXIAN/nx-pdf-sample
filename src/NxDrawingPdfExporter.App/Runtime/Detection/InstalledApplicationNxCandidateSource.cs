@@ -35,16 +35,16 @@ public sealed class InstalledApplicationNxCandidateSource : INxInstallationCandi
         {
             cancellationToken.ThrowIfCancellationRequested();
             candidates.AddRange(entriesReader(view)
-                .Where(entry => IsSiemensNx10(entry.DisplayName) && !string.IsNullOrWhiteSpace(entry.InstallLocation))
+                .Where(entry => IsSupportedNxName(entry.DisplayName) && !string.IsNullOrWhiteSpace(entry.InstallLocation))
                 .Select(entry => new NxInstallationCandidate(entry.InstallLocation!, NxCandidateSource.InstalledApplication)));
         }
 
         return Task.FromResult<IReadOnlyList<NxInstallationCandidate>>(candidates);
     }
 
-    private static bool IsSiemensNx10(string? displayName) =>
+    private static bool IsSupportedNxName(string? displayName) =>
         !string.IsNullOrWhiteSpace(displayName)
-        && displayName.Contains("Siemens NX 10.0", StringComparison.OrdinalIgnoreCase);
+        && System.Text.RegularExpressions.Regex.IsMatch(displayName, @"^Siemens NX (10\.0|2506)(?:\s|$)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     private static IReadOnlyList<InstalledApplicationEntry> ReadEntries(RegistryView view)
     {

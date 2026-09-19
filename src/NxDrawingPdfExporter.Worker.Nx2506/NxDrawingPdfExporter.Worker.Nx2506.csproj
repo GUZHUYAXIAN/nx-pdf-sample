@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>NxDrawingPdfExporter.Worker</RootNamespace>
+    <AssemblyName>NxDrawingPdfExporter.Worker.Nx2506</AssemblyName>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <OutputType>Exe</OutputType>
+    <NxGeneration>2506</NxGeneration>
+    <DefineConstants>$(DefineConstants);NX2506</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\NxDrawingPdfExporter.Worker\*.cs" Link="%(Filename)%(Extension)" />
+    <ProjectReference Include="..\NxDrawingPdfExporter.Contracts\NxDrawingPdfExporter.Contracts.csproj" />
+    <ProjectReference Include="..\NxDrawingPdfExporter.Core\NxDrawingPdfExporter.Core.csproj" />
+  </ItemGroup>
+  <Import Project="..\..\build\NxReference.props" />
+</Project>

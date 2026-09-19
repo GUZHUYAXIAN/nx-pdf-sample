@@ -68,7 +68,7 @@ namespace NxDrawingPdfExporter.App
             ?? discovery.Installations.FirstOrDefault();
 
         internal static string FormatNxCandidate(NxInstallation installation) =>
-            $"{installation.RootDirectory} — NX {installation.DetectedVersion}";
+            $"{installation.Profile.Label} | {installation.RootDirectory} — NXOpen {installation.DetectedVersion} / UF {installation.UfVersion}";
 
         private void BindEvents()
         {
@@ -173,7 +173,7 @@ namespace NxDrawingPdfExporter.App
         {
             using var dialog = new FolderBrowserDialog
             {
-                Description = "请选择包含 UGII 文件夹的 NX 10.0 根目录"
+                Description = "请选择 NX 根目录：NX 10 包含 UGII，NX 2506 包含 NXBIN"
             };
             if (dialog.ShowDialog(this) != DialogResult.OK)
             {

@@ -114,6 +114,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
 
             result.Files = files.ToArray();
             result.EndedUtc = DateTime.UtcNow;
+            result.Completed = true;
             return result;
         }
 

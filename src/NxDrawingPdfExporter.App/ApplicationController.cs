@@ -189,12 +189,17 @@ namespace NxDrawingPdfExporter.App
                 {
                     NxStatusMessage = string.Join(" ", validated.Issues.Select(issue => issue.UserMessage));
                     if (string.IsNullOrWhiteSpace(NxStatusMessage))
-                        NxStatusMessage = "手动选择的目录不是受支持的 NX 10.0.0.24 安装。";
+                        NxStatusMessage = "手动选择的目录不是受支持的 NX 10 / NX 2506 安装。";
                     LogNxIssues(validated.Issues);
                     return;
                 }
 
-                NxDiscovery = validated;
+                NxDiscovery = validated with
+                {
+                    Installations = NxDiscovery.Installations
+                        .Where(i => !string.Equals(i.RootDirectory, validated.SelectedInstallation.RootDirectory, StringComparison.OrdinalIgnoreCase))
+                        .Append(validated.SelectedInstallation).ToArray()
+                };
                 NxStatusMessage = FormatNxStatus(NxDiscovery, NxSettingsLoadStatus.Loaded);
                 await SaveSelectedNxAsync(validated.SelectedInstallation, cancellationToken);
                 LogNxIssues(validated.Issues);
@@ -261,11 +266,11 @@ namespace NxDrawingPdfExporter.App
             }
 
             if (SelectedNx is { } selected
-                && services.NxInstallationDiscovery.ValidateManual(selected.RootDirectory).SelectedInstallation is null)
+                && !SameRuntime(selected, services.NxInstallationDiscovery.ValidateManual(selected.RootDirectory).SelectedInstallation))
             {
                 NxDiscovery = new(Array.Empty<NxInstallation>(), Array.Empty<NxDetectionIssue>(), null);
                 await RefreshNxStatusAsync();
-                ProgressText = "原 NX 安装已失效，已重新检测；请确认后重新开始。";
+                ProgressText = "原 NX 安装已失效或版本发生变化，已重新检测；请确认后重新开始。";
                 Raise();
                 return;
             }
@@ -310,7 +315,7 @@ namespace NxDrawingPdfExporter.App
             NxInstallation? selectedNx = SelectedNx;
             if (selectedNx is null)
             {
-                ProgressText = "没有经过验证的 NX 10.0.0.24，无法开始导出。";
+                ProgressText = "没有经过验证的 NX 10 / NX 2506，无法开始导出。";
                 return;
             }
 
@@ -364,10 +369,10 @@ namespace NxDrawingPdfExporter.App
             }
 
             var workerExePath = services.WorkerExePath
-                ?? Path.Combine(AppContext.BaseDirectory, "worker", "NxDrawingPdfExporter.Worker.exe");
+                ?? Path.Combine(AppContext.BaseDirectory, selectedNx.Profile.WorkerRelativePath);
             if (!File.Exists(workerExePath))
             {
-                ProgressText = "缺少 Worker 组件（worker\\NxDrawingPdfExporter.Worker.exe）。";
+                ProgressText = $"缺少 {selectedNx.Profile.Label} Worker 组件（{selectedNx.Profile.WorkerRelativePath}），请重新解压完整候选包。";
                 return;
             }
 
@@ -410,11 +415,14 @@ namespace NxDrawingPdfExporter.App
             ProgressText = "正在启动 NX Worker…";
             Raise();
 
+            DateTime launchedUtc = DateTime.UtcNow;
             WorkerLaunchResult launch;
             try
             {
                 launch = await Task.Run(() => services.WorkerLauncher.Launch(new WorkerLaunchRequest
                 {
+                    Installation = selectedNx,
+                    KnownNxRoots = NxDiscovery.Installations.Select(i => i.RootDirectory).ToArray(),
                     NxLauncherPath = launcherPathForRun,
                     WorkerExePath = workerExePath,
                     JobPath = jobPath,
@@ -450,9 +458,9 @@ namespace NxDrawingPdfExporter.App
             }
 
             // 结果级校验：结果文件必须属于本次运行，否则整体拒绝发布。
-            if (!string.Equals(result.RunId, runId, StringComparison.Ordinal))
+            if (!WorkerResultValidator.IsTrusted(request, result, launchedUtc, DateTime.UtcNow))
             {
-                runLog.Write("Worker 结果文件的 RunId 与本次运行不符，拒绝发布任何文件。");
+                runLog.Write("Worker 结果的任务身份、条目或完成时间无效，拒绝发布任何文件。");
                 CleanAllRunOwnedTemps(request, runLog);
                 Results = readyItems.Select(item => new FileResult
                 {
@@ -684,7 +692,8 @@ namespace NxDrawingPdfExporter.App
         {
             if (discovery.IsReady)
             {
-                return $"NX {discovery.SelectedInstallation!.DetectedVersion} 已就绪：{discovery.SelectedInstallation.RootDirectory}";
+                return $"{discovery.SelectedInstallation!.Profile.Label} 已就绪（NXOpen {discovery.SelectedInstallation.DetectedVersion} / UF {discovery.SelectedInstallation.UfVersion}）：{discovery.SelectedInstallation.RootDirectory}"
+                    + (discovery.SelectedInstallation.Profile == NxRuntimeProfile.Nx2506 ? "；旧版图纸须核对尺寸标注。" : "");
             }
 
             if (discovery.RequiresSelection)
@@ -694,8 +703,15 @@ namespace NxDrawingPdfExporter.App
 
             string detail = string.Join(" ", discovery.Issues.Select(issue => issue.UserMessage).Distinct());
             return (settingsStatus == NxSettingsLoadStatus.InvalidJson || settingsStatus == NxSettingsLoadStatus.UnsupportedSchema
-                ? "已忽略无效的 NX 保存设置，未检测到受支持的 NX 10.0.0.24。"
-                : "未检测到受支持的 NX 10.0.0.24。") + " " + detail + " 可手动选择包含 UGII 的 NX 根目录。";
+                ? "已忽略无效的 NX 保存设置，未检测到受支持的 NX 10 / NX 2506。"
+                : "未检测到受支持的 NX 10 / NX 2506。") + " " + detail + " 可手动选择包含 UGII（NX 10）或 NXBIN（NX 2506）的 NX 根目录。";
         }
+
+        private static bool SameRuntime(NxInstallation selected, NxInstallation? current) => current is not null
+            && selected.Profile == current.Profile
+            && string.Equals(selected.RootDirectory, current.RootDirectory, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(selected.LauncherPath, current.LauncherPath, StringComparison.OrdinalIgnoreCase)
+            && selected.DetectedVersion == current.DetectedVersion && selected.UfVersion == current.UfVersion
+            && selected.UtilitiesVersion == current.UtilitiesVersion;
     }
 }

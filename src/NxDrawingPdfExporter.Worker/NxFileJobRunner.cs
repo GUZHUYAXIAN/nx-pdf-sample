@@ -30,7 +30,12 @@ namespace NxDrawingPdfExporter.Worker
             try
             {
                 var session = Session.GetSession();
-                openedPart = session.Parts.OpenDisplay(before.FullPath, out loadStatus);
+                try { openedPart = session.Parts.OpenDisplay(before.FullPath, out loadStatus); }
+                catch (NXException error)
+                {
+                    throw new InvalidOperationException("NX 无法加载部件（错误代码 " + error.ErrorCode
+                        + "）。请检查文件是否损坏、是否由更高版本保存及关联组件是否齐全；不会自动换版本重试。", error);
+                }
                 var workPart = openedPart as Part;
                 if (workPart == null)
                 {
@@ -106,6 +111,10 @@ namespace NxDrawingPdfExporter.Worker
                 foreach (var exportIndex in selection.ExportIndices)
                 {
                     reportItems[exportIndex].Selected = true;
+                    var page = reportItems[exportIndex];
+                    Console.WriteLine(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "NX_PDF_PAGE NativeIndex={0} Width={1} Height={2} Units={3} Views={4}",
+                        page.NativeIndex, page.Length, page.Height, page.Units, page.DraftingViewCount));
                 }
 
                 nameMap = new SheetNameMap
@@ -128,10 +137,13 @@ namespace NxDrawingPdfExporter.Worker
             }
             finally
             {
+                loadStatus?.Dispose();
                 if (openedPart != null)
                 {
                     new NxPartCloser().CloseWithoutSaving(openedPart);
                 }
+                if (sourceFileGuard.HasChanged(before))
+                    throw new InvalidOperationException("源 PRT 在处理过程中发生变化，已停止，禁止发布输出。");
             }
         }
 

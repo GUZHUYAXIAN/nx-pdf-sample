@@ -31,7 +31,7 @@ public sealed class EnvironmentNxCandidateSource : INxInstallationCandidateSourc
             if (trimmed.Length >= 2 && trimmed[0] == '"' && trimmed[^1] == '"')
                 trimmed = trimmed[1..^1].Trim();
             trimmed = Path.TrimEndingDirectorySeparator(trimmed);
-            string? parent = string.Equals(Path.GetFileName(trimmed), "UGII", StringComparison.OrdinalIgnoreCase)
+            string? parent = (string.Equals(Path.GetFileName(trimmed), "UGII", StringComparison.OrdinalIgnoreCase) || string.Equals(Path.GetFileName(trimmed), "NXBIN", StringComparison.OrdinalIgnoreCase))
                 ? Path.GetDirectoryName(trimmed)
                 : trimmed;
             AddIfPresent(candidates, parent);

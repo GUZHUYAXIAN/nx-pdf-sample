@@ -5,6 +5,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using NxDrawingPdfExporter.App;
 using NxDrawingPdfExporter.Contracts;
+using NxDrawingPdfExporter.App.Configuration;
 
 // Gate 3 headless driver. Runs the real ApplicationController once and prints
 // the per-file results as JSON. The process exit code is always 0; the JSON
@@ -21,6 +22,7 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
         if (args.Length < 6)
         {
             Console.Error.WriteLine("参数不足。");
@@ -30,10 +32,16 @@ internal static class Program
         var services = new ApplicationServices
         {
             RunRootProvider = () => args[^1],
+            NxSettings = new JsonNxSettingsStore(Path.Combine(args[^1], "validation-settings.json")),
             WorkerExePath = Environment.GetEnvironmentVariable("NXPDF_WORKER_EXE")
         };
 
         var controller = new ApplicationController(services, new ConsoleLogSink());
+        string nxRoot = Environment.GetEnvironmentVariable("NXPDF_NX_ROOT")
+            ?? throw new InvalidOperationException("NXPDF_NX_ROOT is required for explicit validation.");
+        await controller.RefreshNxStatusAsync();
+        var discovered = controller.NxDiscovery.Installations;
+        await controller.SelectManualNxAsync(nxRoot);
         if (string.Equals(args[0], "scan", StringComparison.Ordinal))
         {
             controller.ScanFolderPath = args[1];
@@ -63,6 +71,7 @@ internal static class Program
         {
             var watchDirs = controller.ManualPaths
                 .Select(Path.GetDirectoryName!)
+                .Concat(controller.OutputMode == OutputMode.UnifiedDirectory ? new[] { controller.UnifiedOutputDirectory } : Array.Empty<string>())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             var deadline = DateTime.UtcNow.AddMinutes(15);
@@ -93,6 +102,8 @@ internal static class Program
 
         var payload = new
         {
+            discovered = discovered.Select(i => new { i.Profile.Label, i.RootDirectory, i.DetectedVersion, i.UfVersion, i.UtilitiesVersion, i.Sources }),
+            selected = controller.SelectedNx,
             runDirectory = controller.CurrentRunDirectory,
             results = controller.Results.Select(r => new
             {
@@ -110,7 +121,7 @@ internal static class Program
             WriteIndented = true,
             Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         }));
-        return 0;
+        return controller.Results.Count == 0 ? 4 : 0;
     }
 
     private static void ApplyOutput(ApplicationController controller, string mode, string unified, string policy)

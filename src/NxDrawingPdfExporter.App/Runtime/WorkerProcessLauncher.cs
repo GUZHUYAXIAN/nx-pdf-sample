@@ -7,6 +7,8 @@ namespace NxDrawingPdfExporter.App.Runtime
 {
     public sealed class WorkerLaunchRequest
     {
+        public NxInstallation? Installation { get; init; }
+        public IReadOnlyList<string> KnownNxRoots { get; init; } = Array.Empty<string>();
         public string NxLauncherPath { get; set; } = "";
 
         public string WorkerExePath { get; set; } = "";
@@ -61,16 +63,7 @@ namespace NxDrawingPdfExporter.App.Runtime
             var stderrPath = Path.Combine(request.RunDirectory, "worker-stderr.txt");
 
             using var process = new Process();
-            process.StartInfo = new ProcessStartInfo
-            {
-                FileName = request.NxLauncherPath,
-                Arguments = Quote(request.WorkerExePath) + " --run-job " + Quote(request.JobPath),
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                WorkingDirectory = request.RunDirectory
-            };
+            process.StartInfo = CreateStartInfo(request);
 
             if (!process.Start())
             {
@@ -108,6 +101,26 @@ namespace NxDrawingPdfExporter.App.Runtime
             };
         }
 
-        private static string Quote(string path) => "\"" + path + "\"";
+        internal static ProcessStartInfo CreateStartInfo(WorkerLaunchRequest request)
+        {
+            NxInstallation installation = request.Installation
+                ?? throw new InvalidOperationException("没有绑定经过验证的 NX 安装，无法启动 Worker。");
+            if (!string.Equals(request.NxLauncherPath, installation.LauncherPath, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(Path.GetFileName(request.WorkerExePath), Path.GetFileName(installation.Profile.WorkerRelativePath), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("NX 启动器或 Worker 与所选版本不匹配。");
+            var info = new ProcessStartInfo
+            {
+                FileName = installation.LauncherPath, UseShellExecute = false,
+                RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true,
+                WorkingDirectory = request.RunDirectory
+            };
+            info.ArgumentList.Add(request.WorkerExePath);
+            info.ArgumentList.Add("--run-job");
+            info.ArgumentList.Add(request.JobPath);
+            var child = WorkerEnvironment.Create(installation, info.Environment, request.KnownNxRoots);
+            info.Environment.Clear();
+            foreach (var pair in child) info.Environment[pair.Key] = pair.Value;
+            return info;
+        }
     }
 }

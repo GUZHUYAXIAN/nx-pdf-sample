@@ -143,7 +143,7 @@ public sealed class NxInstallationDiscoveryServiceTests
     }
 
     private NxInstallationDiscoveryService NewService(params INxInstallationCandidateSource[] sources) =>
-        new(sources, new NxInstallationValidator(_ => "10.0.0.24"));
+        new(sources, new NxInstallationValidator(path => Path.GetFileName(path) switch { "NXOpen.UF.dll" => "10.0.0.23", "NXOpen.Utilities.dll" => "4.0.0.0", _ => "10.0.0.24" }));
 
     private string CreateNxLayout(string name)
     {
@@ -151,6 +151,8 @@ public sealed class NxInstallationDiscoveryServiceTests
         Directory.CreateDirectory(Path.Combine(root, "UGII", "managed"));
         File.WriteAllBytes(Path.Combine(root, "UGII", "run_managed.exe"), Array.Empty<byte>());
         File.WriteAllBytes(Path.Combine(root, "UGII", "managed", "NXOpen.dll"), Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(root, "UGII", "managed", "NXOpen.UF.dll"), Array.Empty<byte>());
+        File.WriteAllBytes(Path.Combine(root, "UGII", "managed", "NXOpen.Utilities.dll"), Array.Empty<byte>());
         return root;
     }
 

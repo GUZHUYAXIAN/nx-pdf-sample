@@ -42,13 +42,21 @@ public sealed class RegistryNxCandidateSource : INxInstallationCandidateSource
     private static IReadOnlyList<string> ReadRoots(RegistryView view)
     {
         using RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+        var roots = new List<string>();
+        // These are bounded Siemens product keys, independent of the legacy NX key.
+        foreach (string keyPath in new[] { @"SOFTWARE\Siemens\NX 2506", @"SOFTWARE\Siemens\NX 10.0" })
+        {
+            using RegistryKey? key = baseKey.OpenSubKey(keyPath, writable: false);
+            foreach (string valueName in new[] { "INSTALLDIR", "UGII_BASE_DIR" })
+                if (key?.GetValue(valueName) is string root && !string.IsNullOrWhiteSpace(root))
+                    roots.Add(root);
+        }
         using RegistryKey? nxKey = baseKey.OpenSubKey(NxKeyPath, writable: false);
         if (nxKey is null)
         {
-            return Array.Empty<string>();
+            return roots;
         }
 
-        var roots = new List<string>();
         foreach (string subKeyName in nxKey.GetSubKeyNames())
         {
             using RegistryKey? versionKey = nxKey.OpenSubKey(subKeyName, writable: false);

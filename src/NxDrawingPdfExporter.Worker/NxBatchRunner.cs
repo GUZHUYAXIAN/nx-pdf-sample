@@ -47,7 +47,11 @@ namespace NxDrawingPdfExporter.Worker
 
         // 非 内联：保证测试替换处理器时，NXOpen 依赖的类型加载不会发生。
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static NxJobItemProcessor CreateNxProcessor() => new NxJobItemProcessor();
+        private static NxJobItemProcessor CreateNxProcessor()
+        {
+            NxRuntimeGuard.Verify();
+            return new NxJobItemProcessor();
+        }
 
         private sealed class TargetProbe : IBatchTargetProbe
         {

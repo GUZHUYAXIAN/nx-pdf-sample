@@ -125,7 +125,7 @@ $approvedPathPrefixes = @(
     'D:\a\_work\',
     'D:\repos\empira\'
 )
-$forbiddenLiterals = @('E:\Codex', 'D:\Program Files\Siemens\NX 10.0', 'nx-step-launcher')
+$forbiddenLiterals = @('E:\Codex', 'D:\Program Files\Siemens\NX 10.0', 'D:\Program Files\Siemens\NX2506', 'nx-step-launcher')
 $sourcePathCandidate = [regex]'[A-Za-z]:\\[^\x00-\x08\x0b\x0c\x0e-\x1f"<>|*?]{6,140}'
 $sourcePathIndicator = [regex]'\\(src|source|obj)\\|\.(cs|cpp|hpp|pdb|vb|rs)([^A-Za-z0-9_]|$)'
 foreach ($file in $files) {

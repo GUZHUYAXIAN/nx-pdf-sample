@@ -28,5 +28,9 @@ namespace NxDrawingPdfExporter.Contracts
         /// <summary>Short mapped fatal error description for the whole run; never a stack trace.</summary>
         [DataMember(Order = 7)]
         public string? FatalError { get; set; }
+
+        /// <summary>False for intermediate snapshots; only a terminal result may be published.</summary>
+        [DataMember(Order = 8)]
+        public bool Completed { get; set; }
     }
 }

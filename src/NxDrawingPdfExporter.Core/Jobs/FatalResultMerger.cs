@@ -44,6 +44,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
                 StartedUtc = snapshot?.StartedUtc ?? endedUtc,
                 EndedUtc = endedUtc,
                 FatalError = Sanitize(fatalMessage),
+                Completed = true,
                 Files = files.ToArray()
             };
         }

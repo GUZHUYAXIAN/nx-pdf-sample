@@ -1,4 +1,4 @@
-# Static policy test for the offline release entrypoint.
+﻿# Static policy test for the offline release entrypoint.
 param()
 
 $ErrorActionPreference = 'Stop'
@@ -15,3 +15,10 @@ if ($publishCommands[0] -notmatch '(?:^|\s)--no-restore(?:\s|$)') {
 }
 
 Write-Host 'PUBLISH PORTABLE POLICY TEST: PASS'
+
+$text = Get-Content -LiteralPath $publishScript -Raw
+foreach ($required in @('worker\nx10', 'worker\nx2506', 'NxDrawingPdfExporter.Worker.Nx2506.exe')) {
+    if (-not $text.Contains($required)) { throw "Dual Worker package target missing: $required" }
+}
+if ($text -match 'Sort-Object LastWriteTimeUtc') { throw 'Worker selection must not depend on stale output timestamps.' }
+Write-Host 'DUAL WORKER PACKAGE POLICY: PASS'

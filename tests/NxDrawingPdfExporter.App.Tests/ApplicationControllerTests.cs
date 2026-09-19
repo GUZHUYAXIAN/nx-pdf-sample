@@ -84,6 +84,47 @@ namespace NxDrawingPdfExporter.App.Tests
         }
 
         [TestMethod]
+        [DataRow("missing")]
+        [DataRow("stale")]
+        [DataRow("target")]
+        [DataRow("duplicate")]
+        [DataRow("unknown-status")]
+        [DataRow("incomplete")]
+        public async Task Run_ExitZeroWithUntrustedResult_NeverPublishes(string mode)
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            launcher.OmitResult = mode == "missing";
+            launcher.MutateResult = result => {
+                if (mode == "stale") { result.StartedUtc = DateTime.UtcNow.AddDays(-1); result.EndedUtc = result.StartedUtc; }
+                if (mode == "target") result.Files[0].FinalOutputPath = Path.Combine(scratch, "unexpected.pdf");
+                if (mode == "duplicate") result.Files = new[] { result.Files[0], result.Files[0] };
+                if (mode == "unknown-status") result.Files[0].Status = (FileResultStatus)999;
+                if (mode == "incomplete") result.Completed = false;
+            };
+            await controller.RunAsync();
+            Assert.AreEqual(0, controller.Results.Count(r => r.Status is FileResultStatus.Success or FileResultStatus.Overwritten));
+            Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing1.pdf")));
+            Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing2.pdf")));
+            Assert.IsEmpty(Directory.GetFiles(Path.Combine(scratch, "in"), "*.tmp.pdf"));
+        }
+
+        [TestMethod]
+        public async Task Run_Nx2506Selection_IsBoundToLaunchRequest()
+        {
+            var services = NewServices();
+            var selected = new NxInstallation(@"E:\NX modern", @"E:\NX modern\NXBIN\run_dotnet_nxopen.exe",
+                @"E:\NX modern\NXBIN\managed\NXOpen.dll", "2506.0.0.0", new[] { NxCandidateSource.Manual })
+                { Profile = NxRuntimeProfile.Nx2506, UfVersion = "2506.1700.0.0", UtilitiesVersion = "2506.0.0.0" };
+            ((StubNxDiscovery)services.NxInstallationDiscovery).Result = new(new[] { selected }, Array.Empty<NxDetectionIssue>(), selected);
+            var controller = NewController(services);
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            await controller.RunAsync();
+            Assert.AreEqual(selected, launcher.LaunchCalls.Single().Installation);
+            Assert.AreEqual(selected.LauncherPath, launcher.LaunchCalls.Single().NxLauncherPath);
+            StringAssert.Contains(controller.NxStatusMessage, "NX 2506");
+        }
+        [TestMethod]
         public void Defaults_AreApprovedModes()
         {
             var controller = NewController();
@@ -626,6 +667,8 @@ namespace NxDrawingPdfExporter.App.Tests
 
             /// <summary>模拟 Worker 写出损坏的 result.json（结果不可读）。</summary>
             public bool WriteInvalidResultJson { get; set; }
+            public bool OmitResult { get; set; }
+            public Action<JobResult>? MutateResult { get; set; }
 
             /// <summary>模拟 Worker 写出属于其他运行的结果文件。</summary>
             public string? ResultRunIdOverride { get; set; }
@@ -741,14 +784,16 @@ namespace NxDrawingPdfExporter.App.Tests
                     Files = files.ToArray(),
                     FatalError = ResultFatalError,
                     Cancelled = cancellationObserved
+                    , Completed = true
                 };
+                MutateResult?.Invoke(result);
                 if (WriteInvalidResultJson)
                 {
                     File.WriteAllText(job.ResultPath, "{ 这不是合法的 JSON");
                 }
                 else
                 {
-                    JobJsonSerializer.WriteToFile(result, job.ResultPath);
+                    if (!OmitResult) JobJsonSerializer.WriteToFile(result, job.ResultPath);
                 }
 
                 if (HoldUntilReleased)
