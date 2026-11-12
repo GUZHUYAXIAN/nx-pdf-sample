@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Title" xml:space="preserve"><value>NX 图纸批量导出工具</value></data>
+  <data name="File" xml:space="preserve"><value>文件</value></data>
+  <data name="View" xml:space="preserve"><value>视图</value></data>
+  <data name="Options" xml:space="preserve"><value>选项</value></data>
+  <data name="Help" xml:space="preserve"><value>帮助</value></data>
+  <data name="ScanFolder" xml:space="preserve"><value>选择扫描目录</value></data>
+  <data name="Browse" xml:space="preserve"><value>浏览…</value></data>
+  <data name="Add" xml:space="preserve"><value>添加 PRT…</value></data>
+  <data name="Remove" xml:space="preserve"><value>移除选中</value></data>
+  <data name="Folder" xml:space="preserve"><value>打开选中项所在目录</value></data>
+  <data name="Exit" xml:space="preserve"><value>退出</value></data>
+  <data name="Settings" xml:space="preserve"><value>设置</value></data>
+  <data name="Problems" xml:space="preserve"><value>仅显示问题</value></data>
+  <data name="Search" xml:space="preserve"><value>搜索文件名</value></data>
+  <data name="ResetLayout" xml:space="preserve"><value>恢复默认布局</value></data>
+  <data name="Language" xml:space="preserve"><value>语言</value></data>
+  <data name="Appearance" xml:space="preserve"><value>主题与皮肤…</value></data>
+  <data name="Font" xml:space="preserve"><value>界面字号</value></data>
+  <data name="Guide" xml:space="preserve"><value>本地使用说明</value></data>
+  <data name="RevisionRules" xml:space="preserve"><value>版次规则</value></data>
+  <data name="Log" xml:space="preserve"><value>打开运行日志</value></data>
+  <data name="About" xml:space="preserve"><value>关于</value></data>
+  <data name="Scan" xml:space="preserve"><value>扫描文件夹</value></data>
+  <data name="Manual" xml:space="preserve"><value>手动多选</value></data>
+  <data name="Recursive" xml:space="preserve"><value>包含子文件夹</value></data>
+  <data name="ManualList" xml:space="preserve"><value>手动文件清单</value></data>
+  <data name="Grouped" xml:space="preserve"><value>分组输出（默认跟随 PRT 目录）</value></data>
+  <data name="Unified" xml:space="preserve"><value>统一输出目录</value></data>
+  <data name="Custom" xml:space="preserve"><value>自定义</value></data>
+  <data name="RestoreFolder" xml:space="preserve"><value>恢复源目录</value></data>
+  <data name="EmptyGroups" xml:space="preserve"><value>选择或扫描 PRT 后显示输出目录。</value></data>
+  <data name="Skip" xml:space="preserve"><value>跳过已有原名 PDF</value></data>
+  <data name="Overwrite" xml:space="preserve"><value>安全覆盖原名 PDF</value></data>
+  <data name="Revision" xml:space="preserve"><value>升版（可指定版次）</value></data>
+  <data name="Preflight" xml:space="preserve"><value>预检查</value></data>
+  <data name="Results" xml:space="preserve"><value>运行结果</value></data>
+  <data name="Start" xml:space="preserve"><value>开始导出</value></data>
+  <data name="Cancel" xml:space="preserve"><value>取消</value></data>
+  <data name="Ready" xml:space="preserve"><value>就绪。</value></data>
+  <data name="Ordinal" xml:space="preserve"><value>序号</value></data>
+  <data name="Group" xml:space="preserve"><value>目录组</value></data>
+  <data name="Source" xml:space="preserve"><value>源 PRT</value></data>
+  <data name="Target" xml:space="preserve"><value>目标 PDF</value></data>
+  <data name="Status" xml:space="preserve"><value>状态</value></data>
+  <data name="Rev" xml:space="preserve"><value>版次</value></data>
+  <data name="Detail" xml:space="preserve"><value>详情</value></data>
+  <data name="Copy" xml:space="preserve"><value>复制路径</value></data>
+  <data name="ChooseFolder" xml:space="preserve"><value>选择要打开的目录</value></data>
+  <data name="Close" xml:space="preserve"><value>关闭</value></data>
+  <data name="RefreshNx" xml:space="preserve"><value>重新检测</value></data>
+  <data name="SelectNx" xml:space="preserve"><value>使用选中 NX</value></data>
+  <data name="BrowseNx" xml:space="preserve"><value>选择 NX 根目录…</value></data>
+  <data name="NxBrowseHint" xml:space="preserve"><value>NX 10 根目录包含 UGII，NX 2506 根目录包含 NXBIN。</value></data>
+  <data name="NxError" xml:space="preserve"><value>NX 操作未完成，请重新检测。</value></data>
+  <data name="NoFolder" xml:space="preserve"><value>当前选中项没有可打开的目录。</value></data>
+  <data name="NoLog" xml:space="preserve"><value>还没有可用的运行日志。</value></data>
+  <data name="NoSelection" xml:space="preserve"><value>请先选择需要操作的行。</value></data>
+  <data name="BatchRev" xml:space="preserve"><value>设置选中项版次…</value></data>
+  <data name="RestoreRev" xml:space="preserve"><value>恢复推荐版次</value></data>
+  <data name="RevisionInput" xml:space="preserve"><value>输入 0、2 或 R100 等有效版次。</value></data>
+  <data name="VisibleCount" xml:space="preserve"><value>显示 {0} / {1}</value></data>
+  <data name="SettingsSummary" xml:space="preserve"><value>{0} · {1} 个文件 · {2}</value></data>
+  <data name="NxUnselected" xml:space="preserve"><value>尚未选择 NX</value></data>
+  <data name="Stale" xml:space="preserve"><value>需要重新预检查</value></data>
+  <data name="Create" xml:space="preserve"><value>待新增</value></data>
+  <data name="Replace" xml:space="preserve"><value>将覆盖</value></data>
+  <data name="HighestSource" xml:space="preserve"><value>源目录最高版次</value></data>
+  <data name="HighestTarget" xml:space="preserve"><value>目标目录最高版次</value></data>
+  <data name="Suggested" xml:space="preserve"><value>建议版次</value></data>
+  <data name="ManualValue" xml:space="preserve"><value>手动版次</value></data>
+  <data name="RunError" xml:space="preserve"><value>运行失败。</value></data>
+  <data name="PreflightError" xml:space="preserve"><value>预检查失败。</value></data>
+  <data name="PendingClose" xml:space="preserve"><value>正在等待当前文件安全完成，随后关闭…</value></data>
+  <data name="NoRun" xml:space="preserve"><value>尚未运行。</value></data>
+  <data name="Summary" xml:space="preserve"><value>共 {0} 项 · 成功 {1} · 覆盖 {2} · 已有跳过 {3} · 纯模型 {4} · 无有效页 {5} · 名称冲突 {6} · 取消 {7} · 失败 {8}</value></data>
+  <data name="Apply" xml:space="preserve"><value>应用</value></data>
+  <data name="RestoreTheme" xml:space="preserve"><value>恢复当前预设</value></data>
+  <data name="Import" xml:space="preserve"><value>导入图片…</value></data>
+  <data name="ImageVisibility" xml:space="preserve"><value>图片显现程度</value></data>
+  <data name="Zoom" xml:space="preserve"><value>缩放</value></data>
+  <data name="OffsetX" xml:space="preserve"><value>水平位置</value></data>
+  <data name="OffsetY" xml:space="preserve"><value>垂直位置</value></data>
+  <data name="Blur" xml:space="preserve"><value>模糊</value></data>
+  <data name="Mist" xml:space="preserve"><value>雾化</value></data>
+  <data name="Gradient" xml:space="preserve"><value>渐变</value></data>
+  <data name="ImageError" xml:space="preserve"><value>无法载入图片。请选择不超过 32 MiB、4096 万像素的 PNG 或 JPEG。</value></data>
+  <data name="ThemeUnavailable" xml:space="preserve"><value>皮肤素材无法读取，已使用云白。请重新解压完整候选包或重新导入图片。</value></data>
+  <data name="SettingsFallback" xml:space="preserve"><value>界面设置无法恢复，已使用默认值。</value></data>
+  <data name="SettingsError" xml:space="preserve"><value>无法保存界面设置。</value></data>
+  <data name="Theme.cloud" xml:space="preserve"><value>云白</value></data>
+  <data name="Theme.graphite" xml:space="preserve"><value>石墨黑</value></data>
+  <data name="Theme.lake" xml:space="preserve"><value>湖蓝</value></data>
+  <data name="Theme.pine" xml:space="preserve"><value>松绿</value></data>
+  <data name="Theme.sand" xml:space="preserve"><value>暖砂</value></data>
+  <data name="Theme.rem" xml:space="preserve"><value>蕾姆</value></data>
+  <data name="Theme.inori" xml:space="preserve"><value>楪祈</value></data>
+  <data name="Theme.frieren" xml:space="preserve"><value>芙莉莲</value></data>
+  <data name="Theme.roxy" xml:space="preserve"><value>洛琪希</value></data>
+  <data name="Theme.imported" xml:space="preserve"><value>导入的图片</value></data>
+  <data name="GuideBody" xml:space="preserve"><value>先选 NX 和 PRT，配置输出后预检查。查看各项目标与状态，修正问题后开始导出。每个 PRT 只导出含实际制图视图的页。</value></data>
+  <data name="RevisionBody" xml:space="preserve"><value>升版取源目录和目标目录的最高数字版次加一。无历史建议 0，输出原名。输入 2 或 R100 可指定版次，指定目标已存在时安全覆盖。</value></data>
+  <data name="PolicyOriginal" xml:space="preserve"><value>此策略仅检查完整基本名加 .pdf，不查找 R 版。</value></data>
+  <data name="Result.Success" xml:space="preserve"><value>成功</value></data>
+  <data name="Result.Overwritten" xml:space="preserve"><value>已覆盖</value></data>
+  <data name="Result.SkippedExisting" xml:space="preserve"><value>已存在，跳过</value></data>
+  <data name="Result.PureModel" xml:space="preserve"><value>纯模型，跳过</value></data>
+  <data name="Result.NoValidSheets" xml:space="preserve"><value>无有效图纸页</value></data>
+  <data name="Result.NameConflict" xml:space="preserve"><value>名称冲突</value></data>
+  <data name="Result.Cancelled" xml:space="preserve"><value>已取消</value></data>
+  <data name="Result.Failed" xml:space="preserve"><value>失败</value></data>
+  <data name="Reason.Unknown" xml:space="preserve"><value>请查看技术详情。</value></data>
+  <data name="Reason.TargetChanged" xml:space="preserve"><value>预检查后文件或版次历史发生变化，请重新检查。</value></data>
+  <data name="Reason.NameConflict" xml:space="preserve"><value>多个源文件指向同一 PDF。</value></data>
+  <data name="Reason.Cancelled" xml:space="preserve"><value>已在文件边界停止。</value></data>
+  <data name="Reason.WorkerFailure" xml:space="preserve"><value>NX 导出失败，请查看技术详情。</value></data>
+  <data name="Reason.TemporaryPdfReady" xml:space="preserve"><value>已生成临时 PDF，等待验证。</value></data>
+  <data name="Reason.PureModel" xml:space="preserve"><value>部件不包含图纸页。</value></data>
+  <data name="Reason.NoValidSheets" xml:space="preserve"><value>没有图纸页包含实际制图视图。</value></data>
+  <data name="Reason.MissingModel" xml:space="preserve"><value>关联模型未完全加载，请检查依赖。</value></data>
+  <data name="Reason.ViewUpdateFailed" xml:space="preserve"><value>制图视图更新失败，请检查图纸和关联模型。</value></data>
+  <data name="Reason.SourceChanged" xml:space="preserve"><value>源 PRT 发生变化，已停止。</value></data>
+  <data name="Reason.PartLoadFailed" xml:space="preserve"><value>NX 无法打开部件。请检查文件完整性、NX 版本和依赖。</value></data>
+  <data name="Reason.Ready" xml:space="preserve"><value>路径与输出规则已检查，图纸内容将在导出时检查。</value></data>
+  <data name="Reason.SkippedExisting" xml:space="preserve"><value>原名 PDF 已存在，按策略跳过。</value></data>
+  <data name="Reason.Published" xml:space="preserve"><value>临时 PDF 通过校验，正式 PDF 已发布。</value></data>
+  <data name="Reason.Overwritten" xml:space="preserve"><value>新 PDF 通过校验，已替换预定目标。</value></data>
+  <data name="Reason.PublicationFailed" xml:space="preserve"><value>PDF 验证或发布失败。请查看技术详情并检查保留的备份。</value></data>
+  <data name="Reason.DirectoryUnreadable" xml:space="preserve"><value>无法读取或使用输出规则涉及的目录。</value></data>
+  <data name="Reason.InvalidRevision" xml:space="preserve"><value>请输入 0 至 2147483647 的整数版次，可加 R。</value></data>
+  <data name="Reason.RevisionAlias" xml:space="preserve"><value>发现非规范或重复版次文件，请检查其名称。</value></data>
+  <data name="Reason.RevisionLimit" xml:space="preserve"><value>最高版次无法再递增，请手动指定有效版次。</value></data>
+  <data name="Reason.FamilyConflict" xml:space="preserve"><value>制图的版次家族重叠，请调整输出目录或任务。</value></data>
+  <data name="Reason.WorkerResultInvalid" xml:space="preserve"><value>Worker 结果缺失或与任务不匹配。</value></data>
+  <data name="NxChanged" xml:space="preserve"><value>原 NX 安装已失效或版本发生变化，已重新检测；请确认后重新开始。</value></data>
+  <data name="Preparing" xml:space="preserve"><value>正在准备运行…</value></data>
+  <data name="Stopping" xml:space="preserve"><value>已请求取消，将在当前文件完成后停止。</value></data>
+  <data name="NxRequired" xml:space="preserve"><value>没有经过验证的 NX 10 / NX 2506，无法开始导出。</value></data>
+  <data name="NoInput" xml:space="preserve"><value>未发现任何候选 PRT 文件。</value></data>
+  <data name="ReviewNeeded" xml:space="preserve"><value>请重新预检查并修正版次后再开始。</value></data>
+  <data name="Blocked" xml:space="preserve"><value>存在预检查问题，已阻止执行。</value></data>
+  <data name="PreflightChanged" xml:space="preserve"><value>文件事实已变化，请重新预检查。</value></data>
+  <data name="AllSkipped" xml:space="preserve"><value>全部目标 PDF 已存在，按跳过策略无需导出。</value></data>
+  <data name="WorkerStarting" xml:space="preserve"><value>正在启动 NX Worker…</value></data>
+  <data name="WorkerTimeout" xml:space="preserve"><value>Worker 运行超时，已终止；详见运行日志。</value></data>
+  <data name="WorkerInvalid" xml:space="preserve"><value>Worker 未写出有效结果文件，本次运行不能视为成功。</value></data>
+  <data name="WorkerMismatch" xml:space="preserve"><value>Worker 结果文件与本次运行不匹配，已拒绝发布。</value></data>
+  <data name="PublishStopping" xml:space="preserve"><value>已请求取消，将在当前文件发布完成后停止。</value></data>
+  <data name="PublishStopped" xml:space="preserve"><value>已取消：已在文件边界停止发布。</value></data>
+  <data name="WorkerCancelled" xml:space="preserve"><value>已按要求取消：已完成的文件已发布，其余文件未执行。</value></data>
+  <data name="Completed" xml:space="preserve"><value>运行完成。</value></data>
+  <data name="WorkerMissing" xml:space="preserve"><value>缺少 {0} Worker 组件（{1}），请重新解压完整候选包。</value></data>
+  <data name="WorkerFailed" xml:space="preserve"><value>Worker 启动失败，请查看日志。</value></data>
+  <data name="Publishing" xml:space="preserve"><value>正在验证并发布 {0}/{1}…</value></data>
+  <data name="Fatal" xml:space="preserve"><value>批处理发生致命错误，请查看日志。</value></data>
+  <data name="InputFailed" xml:space="preserve"><value>输入收集失败，请检查文件及目录。</value></data>
+  <data name="NxNotChecked" xml:space="preserve"><value>尚未检测 NX。</value></data>
+  <data name="NxDetecting" xml:space="preserve"><value>正在检测 NX…</value></data>
+  <data name="NxSaveFailed" xml:space="preserve"><value>NX 已选定，但无法保存下次启动设置。</value></data>
+  <data name="NxLogFailed" xml:space="preserve"><value> 无法保存 NX 检测诊断，请保留当前状态截图。</value></data>
+  <data name="NxReady" xml:space="preserve"><value>{0} 已就绪（NXOpen {1} / UF {2}）：{3}</value></data>
+  <data name="NxLegacy" xml:space="preserve"><value>；旧版图纸须核对尺寸标注。</value></data>
+  <data name="NxPick" xml:space="preserve"><value>检测到多个受支持的 NX 安装，请选择后继续。</value></data>
+  <data name="NxUnavailable" xml:space="preserve"><value>未检测到受支持的 NX 10 / NX 2506。</value></data>
+  <data name="NxSettingsInvalid" xml:space="preserve"><value>已忽略无效的 NX 保存设置。</value></data>
+  <data name="NxManualInvalid" xml:space="preserve"><value>手动选择的目录不是受支持的 NX 10 / NX 2506 安装。</value></data>
+  <data name="NxIssue.InvalidPath" xml:space="preserve"><value>NX 根目录路径无效。</value></data>
+  <data name="NxIssue.RootMissing" xml:space="preserve"><value>NX 根目录不存在。</value></data>
+  <data name="NxIssue.LauncherMissing" xml:space="preserve"><value>缺少 NX 启动器。</value></data>
+  <data name="NxIssue.NxOpenMissing" xml:space="preserve"><value>缺少 NX Open 组件。</value></data>
+  <data name="NxIssue.VersionUnreadable" xml:space="preserve"><value>无法读取 NX 组件版本。</value></data>
+  <data name="NxIssue.UnsupportedVersion" xml:space="preserve"><value>NX 组件版本组合不受支持。</value></data>
+  <data name="NxIssue.CandidateSourceFailed" xml:space="preserve"><value>无法读取一个 NX 检测来源。</value></data>
+  <data name="NxIssue.SettingsUnavailable" xml:space="preserve"><value>无法读取 NX 设置。</value></data>
+</root>

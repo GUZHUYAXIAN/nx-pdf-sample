@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Title" xml:space="preserve"><value>NX Drawing PDF Exporter</value></data>
+  <data name="File" xml:space="preserve"><value>File</value></data>
+  <data name="View" xml:space="preserve"><value>View</value></data>
+  <data name="Options" xml:space="preserve"><value>Options</value></data>
+  <data name="Help" xml:space="preserve"><value>Help</value></data>
+  <data name="ScanFolder" xml:space="preserve"><value>Choose scan folder</value></data>
+  <data name="Browse" xml:space="preserve"><value>Browse…</value></data>
+  <data name="Add" xml:space="preserve"><value>Add PRT…</value></data>
+  <data name="Remove" xml:space="preserve"><value>Remove selected</value></data>
+  <data name="Folder" xml:space="preserve"><value>Open selected file location</value></data>
+  <data name="Exit" xml:space="preserve"><value>Exit</value></data>
+  <data name="Settings" xml:space="preserve"><value>Settings</value></data>
+  <data name="Problems" xml:space="preserve"><value>Show problems only</value></data>
+  <data name="Search" xml:space="preserve"><value>Search filenames</value></data>
+  <data name="ResetLayout" xml:space="preserve"><value>Reset layout</value></data>
+  <data name="Language" xml:space="preserve"><value>Language</value></data>
+  <data name="Appearance" xml:space="preserve"><value>Theme and skin…</value></data>
+  <data name="Font" xml:space="preserve"><value>Text size</value></data>
+  <data name="Guide" xml:space="preserve"><value>Local help</value></data>
+  <data name="RevisionRules" xml:space="preserve"><value>Revision rules</value></data>
+  <data name="Log" xml:space="preserve"><value>Open run log</value></data>
+  <data name="About" xml:space="preserve"><value>About</value></data>
+  <data name="Scan" xml:space="preserve"><value>Scan folder</value></data>
+  <data name="Manual" xml:space="preserve"><value>Manual selection</value></data>
+  <data name="Recursive" xml:space="preserve"><value>Include subfolders</value></data>
+  <data name="ManualList" xml:space="preserve"><value>Manual file list</value></data>
+  <data name="Grouped" xml:space="preserve"><value>Grouped output (defaults to PRT folders)</value></data>
+  <data name="Unified" xml:space="preserve"><value>Unified output directory</value></data>
+  <data name="Custom" xml:space="preserve"><value>Custom</value></data>
+  <data name="RestoreFolder" xml:space="preserve"><value>Use source directory</value></data>
+  <data name="EmptyGroups" xml:space="preserve"><value>Output directories appear after selecting or scanning PRT files.</value></data>
+  <data name="Skip" xml:space="preserve"><value>Skip existing original-name PDFs</value></data>
+  <data name="Overwrite" xml:space="preserve"><value>Safely replace original-name PDFs</value></data>
+  <data name="Revision" xml:space="preserve"><value>Revision (editable)</value></data>
+  <data name="Preflight" xml:space="preserve"><value>Preflight</value></data>
+  <data name="Results" xml:space="preserve"><value>Results</value></data>
+  <data name="Start" xml:space="preserve"><value>Export</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Ready" xml:space="preserve"><value>Ready.</value></data>
+  <data name="Ordinal" xml:space="preserve"><value>No.</value></data>
+  <data name="Group" xml:space="preserve"><value>Group</value></data>
+  <data name="Source" xml:space="preserve"><value>Source PRT</value></data>
+  <data name="Target" xml:space="preserve"><value>Target PDF</value></data>
+  <data name="Status" xml:space="preserve"><value>Status</value></data>
+  <data name="Rev" xml:space="preserve"><value>Revision</value></data>
+  <data name="Detail" xml:space="preserve"><value>Details</value></data>
+  <data name="Copy" xml:space="preserve"><value>Copy paths</value></data>
+  <data name="ChooseFolder" xml:space="preserve"><value>Choose a directory to open</value></data>
+  <data name="Close" xml:space="preserve"><value>Close</value></data>
+  <data name="RefreshNx" xml:space="preserve"><value>Detect again</value></data>
+  <data name="SelectNx" xml:space="preserve"><value>Use selected NX</value></data>
+  <data name="BrowseNx" xml:space="preserve"><value>Choose NX root…</value></data>
+  <data name="NxBrowseHint" xml:space="preserve"><value>Choose the NX 10 root containing UGII or the NX 2506 root containing NXBIN.</value></data>
+  <data name="NxError" xml:space="preserve"><value>The NX operation could not complete. Detect again.</value></data>
+  <data name="NoFolder" xml:space="preserve"><value>The selection has no directory to open.</value></data>
+  <data name="NoLog" xml:space="preserve"><value>No run log is available yet.</value></data>
+  <data name="NoSelection" xml:space="preserve"><value>Select the rows to change.</value></data>
+  <data name="BatchRev" xml:space="preserve"><value>Set revision for selection…</value></data>
+  <data name="RestoreRev" xml:space="preserve"><value>Restore suggested revisions</value></data>
+  <data name="RevisionInput" xml:space="preserve"><value>Enter a revision such as 0, 2, or R100.</value></data>
+  <data name="VisibleCount" xml:space="preserve"><value>Showing {0} / {1}</value></data>
+  <data name="SettingsSummary" xml:space="preserve"><value>{0} · {1} files · {2}</value></data>
+  <data name="NxUnselected" xml:space="preserve"><value>No NX selected</value></data>
+  <data name="Stale" xml:space="preserve"><value>Preflight needs refresh</value></data>
+  <data name="Create" xml:space="preserve"><value>Will create</value></data>
+  <data name="Replace" xml:space="preserve"><value>Will replace</value></data>
+  <data name="HighestSource" xml:space="preserve"><value>Highest in source</value></data>
+  <data name="HighestTarget" xml:space="preserve"><value>Highest in destination</value></data>
+  <data name="Suggested" xml:space="preserve"><value>Suggested revision</value></data>
+  <data name="ManualValue" xml:space="preserve"><value>Manual revision</value></data>
+  <data name="RunError" xml:space="preserve"><value>Export failed.</value></data>
+  <data name="PreflightError" xml:space="preserve"><value>Preflight failed.</value></data>
+  <data name="PendingClose" xml:space="preserve"><value>Waiting for the current file to finish before closing…</value></data>
+  <data name="NoRun" xml:space="preserve"><value>No run yet.</value></data>
+  <data name="Summary" xml:space="preserve"><value>{0} total · {1} created · {2} replaced · {3} existing · {4} models · {5} no valid sheets · {6} conflicts · {7} cancelled · {8} failed</value></data>
+  <data name="Apply" xml:space="preserve"><value>Apply</value></data>
+  <data name="RestoreTheme" xml:space="preserve"><value>Reset current preset</value></data>
+  <data name="Import" xml:space="preserve"><value>Import image…</value></data>
+  <data name="ImageVisibility" xml:space="preserve"><value>Image visibility</value></data>
+  <data name="Zoom" xml:space="preserve"><value>Zoom</value></data>
+  <data name="OffsetX" xml:space="preserve"><value>Horizontal position</value></data>
+  <data name="OffsetY" xml:space="preserve"><value>Vertical position</value></data>
+  <data name="Blur" xml:space="preserve"><value>Blur</value></data>
+  <data name="Mist" xml:space="preserve"><value>Mist</value></data>
+  <data name="Gradient" xml:space="preserve"><value>Gradient</value></data>
+  <data name="ImageError" xml:space="preserve"><value>Could not load the image. Choose a PNG or JPEG up to 32 MiB and 40.96 million pixels.</value></data>
+  <data name="ThemeUnavailable" xml:space="preserve"><value>The skin image is unavailable. Cloud is active. Extract the complete package or import the image again.</value></data>
+  <data name="SettingsFallback" xml:space="preserve"><value>Appearance settings could not be loaded. Defaults are active.</value></data>
+  <data name="SettingsError" xml:space="preserve"><value>Could not save appearance settings.</value></data>
+  <data name="Theme.cloud" xml:space="preserve"><value>Cloud</value></data>
+  <data name="Theme.graphite" xml:space="preserve"><value>Graphite</value></data>
+  <data name="Theme.lake" xml:space="preserve"><value>Lake</value></data>
+  <data name="Theme.pine" xml:space="preserve"><value>Pine</value></data>
+  <data name="Theme.sand" xml:space="preserve"><value>Sand</value></data>
+  <data name="Theme.rem" xml:space="preserve"><value>Rem</value></data>
+  <data name="Theme.inori" xml:space="preserve"><value>Inori</value></data>
+  <data name="Theme.frieren" xml:space="preserve"><value>Frieren</value></data>
+  <data name="Theme.roxy" xml:space="preserve"><value>Roxy</value></data>
+  <data name="Theme.imported" xml:space="preserve"><value>Imported image</value></data>
+  <data name="GuideBody" xml:space="preserve"><value>Select NX and PRT inputs, configure destinations, and run preflight. Review targets and resolve problems before exporting. Only sheets with drafting views are included.</value></data>
+  <data name="RevisionBody" xml:space="preserve"><value>Revision uses one more than the highest number in the source and destination folders. With no history, 0 keeps the original name. Enter 2 or R100 to choose a revision. Existing selected targets are safely replaced.</value></data>
+  <data name="PolicyOriginal" xml:space="preserve"><value>This policy checks only the full basename with .pdf.</value></data>
+  <data name="Result.Success" xml:space="preserve"><value>Created</value></data>
+  <data name="Result.Overwritten" xml:space="preserve"><value>Replaced</value></data>
+  <data name="Result.SkippedExisting" xml:space="preserve"><value>Skipped existing</value></data>
+  <data name="Result.PureModel" xml:space="preserve"><value>Model only</value></data>
+  <data name="Result.NoValidSheets" xml:space="preserve"><value>No eligible sheets</value></data>
+  <data name="Result.NameConflict" xml:space="preserve"><value>Name conflict</value></data>
+  <data name="Result.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="Result.Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Reason.Unknown" xml:space="preserve"><value>See technical details.</value></data>
+  <data name="Reason.TargetChanged" xml:space="preserve"><value>A file or revision history changed after preflight. Check again.</value></data>
+  <data name="Reason.NameConflict" xml:space="preserve"><value>Multiple source files resolve to the same PDF.</value></data>
+  <data name="Reason.Cancelled" xml:space="preserve"><value>Stopped at a file boundary.</value></data>
+  <data name="Reason.WorkerFailure" xml:space="preserve"><value>NX export failed. See technical details.</value></data>
+  <data name="Reason.TemporaryPdfReady" xml:space="preserve"><value>Temporary PDF created, awaiting validation.</value></data>
+  <data name="Reason.PureModel" xml:space="preserve"><value>The part contains no drawing sheets.</value></data>
+  <data name="Reason.NoValidSheets" xml:space="preserve"><value>No sheets contain drafting views.</value></data>
+  <data name="Reason.MissingModel" xml:space="preserve"><value>A referenced model did not fully load. Check the dependencies.</value></data>
+  <data name="Reason.ViewUpdateFailed" xml:space="preserve"><value>Drafting view update failed. Check the drawing and its referenced models.</value></data>
+  <data name="Reason.SourceChanged" xml:space="preserve"><value>The source PRT changed. Processing stopped.</value></data>
+  <data name="Reason.PartLoadFailed" xml:space="preserve"><value>NX could not open the part. Check file integrity, NX version, and dependencies.</value></data>
+  <data name="Reason.Ready" xml:space="preserve"><value>Paths and output rules passed preflight. Drawing contents are checked during export.</value></data>
+  <data name="Reason.SkippedExisting" xml:space="preserve"><value>The original-name PDF already exists and will be skipped.</value></data>
+  <data name="Reason.Published" xml:space="preserve"><value>The temporary PDF passed validation and was published.</value></data>
+  <data name="Reason.Overwritten" xml:space="preserve"><value>The new PDF passed validation and replaced the planned target.</value></data>
+  <data name="Reason.PublicationFailed" xml:space="preserve"><value>PDF validation or publication failed. See technical details and inspect any retained backup.</value></data>
+  <data name="Reason.DirectoryUnreadable" xml:space="preserve"><value>A directory required by the output rules cannot be read or used.</value></data>
+  <data name="Reason.InvalidRevision" xml:space="preserve"><value>Enter an integer from 0 to 2147483647, optionally prefixed with R.</value></data>
+  <data name="Reason.RevisionAlias" xml:space="preserve"><value>A noncanonical or duplicate revision filename was found.</value></data>
+  <data name="Reason.RevisionLimit" xml:space="preserve"><value>The highest revision cannot be incremented. Choose a valid revision manually.</value></data>
+  <data name="Reason.FamilyConflict" xml:space="preserve"><value>Drawing revision families overlap. Change the destinations or inputs.</value></data>
+  <data name="Reason.WorkerResultInvalid" xml:space="preserve"><value>The Worker result is missing or does not match this run.</value></data>
+  <data name="NxChanged" xml:space="preserve"><value>The selected NX installation changed. Confirm the detected installation and try again.</value></data>
+  <data name="Preparing" xml:space="preserve"><value>Preparing export…</value></data>
+  <data name="Stopping" xml:space="preserve"><value>Cancellation requested. Waiting for the current file.</value></data>
+  <data name="NxRequired" xml:space="preserve"><value>A validated NX 10 or NX 2506 installation is required.</value></data>
+  <data name="NoInput" xml:space="preserve"><value>No candidate PRT files were found.</value></data>
+  <data name="ReviewNeeded" xml:space="preserve"><value>Refresh preflight and correct revision entries before exporting.</value></data>
+  <data name="Blocked" xml:space="preserve"><value>Resolve the preflight issues before exporting.</value></data>
+  <data name="PreflightChanged" xml:space="preserve"><value>Files changed. Refresh preflight.</value></data>
+  <data name="AllSkipped" xml:space="preserve"><value>All original-name PDFs already exist. No export is needed.</value></data>
+  <data name="WorkerStarting" xml:space="preserve"><value>Starting NX Worker…</value></data>
+  <data name="WorkerTimeout" xml:space="preserve"><value>The Worker timed out. See the run log.</value></data>
+  <data name="WorkerInvalid" xml:space="preserve"><value>The Worker did not write a valid result file.</value></data>
+  <data name="WorkerMismatch" xml:space="preserve"><value>The Worker result does not match this run. Publication stopped.</value></data>
+  <data name="PublishStopping" xml:space="preserve"><value>Waiting for the current publication before cancelling.</value></data>
+  <data name="PublishStopped" xml:space="preserve"><value>Publication cancelled at a file boundary.</value></data>
+  <data name="WorkerCancelled" xml:space="preserve"><value>Cancelled. Completed files were published and remaining files were skipped.</value></data>
+  <data name="Completed" xml:space="preserve"><value>Run complete.</value></data>
+  <data name="WorkerMissing" xml:space="preserve"><value>The {0} Worker is missing ({1}). Extract the complete package again.</value></data>
+  <data name="WorkerFailed" xml:space="preserve"><value>Could not start the Worker. See the run log.</value></data>
+  <data name="Publishing" xml:space="preserve"><value>Validating and publishing {0}/{1}…</value></data>
+  <data name="Fatal" xml:space="preserve"><value>The batch stopped with a fatal error. See the run log.</value></data>
+  <data name="InputFailed" xml:space="preserve"><value>Could not collect input files. Check the files and directories.</value></data>
+  <data name="NxNotChecked" xml:space="preserve"><value>NX detection has not run.</value></data>
+  <data name="NxDetecting" xml:space="preserve"><value>Detecting NX…</value></data>
+  <data name="NxSaveFailed" xml:space="preserve"><value>NX is selected, but the selection could not be saved.</value></data>
+  <data name="NxLogFailed" xml:space="preserve"><value> NX detection diagnostics could not be saved.</value></data>
+  <data name="NxReady" xml:space="preserve"><value>{0} ready (NXOpen {1} / UF {2}): {3}</value></data>
+  <data name="NxLegacy" xml:space="preserve"><value> · Check dimensions on older drawings.</value></data>
+  <data name="NxPick" xml:space="preserve"><value>Multiple supported NX installations were found. Choose one to continue.</value></data>
+  <data name="NxUnavailable" xml:space="preserve"><value>No supported NX 10 or NX 2506 installation was found.</value></data>
+  <data name="NxSettingsInvalid" xml:space="preserve"><value>Invalid saved NX settings were ignored.</value></data>
+  <data name="NxManualInvalid" xml:space="preserve"><value>The chosen directory is not a supported NX 10 or NX 2506 installation.</value></data>
+  <data name="NxIssue.InvalidPath" xml:space="preserve"><value>Invalid NX root directory.</value></data>
+  <data name="NxIssue.RootMissing" xml:space="preserve"><value>NX root directory does not exist.</value></data>
+  <data name="NxIssue.LauncherMissing" xml:space="preserve"><value>The NX launcher is missing.</value></data>
+  <data name="NxIssue.NxOpenMissing" xml:space="preserve"><value>An NX Open component is missing.</value></data>
+  <data name="NxIssue.VersionUnreadable" xml:space="preserve"><value>An NX component version could not be read.</value></data>
+  <data name="NxIssue.UnsupportedVersion" xml:space="preserve"><value>The NX component version combination is unsupported.</value></data>
+  <data name="NxIssue.CandidateSourceFailed" xml:space="preserve"><value>An NX detection source could not be read.</value></data>
+  <data name="NxIssue.SettingsUnavailable" xml:space="preserve"><value>NX settings could not be read.</value></data>
+</root>
