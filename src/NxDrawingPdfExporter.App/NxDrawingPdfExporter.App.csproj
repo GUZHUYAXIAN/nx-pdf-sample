@@ -35,4 +35,13 @@
     <InternalsVisibleTo Include="NxDrawingPdfExporter.App.Tests" />
   </ItemGroup>
 
+  <Target Name="KeepEnglishSatelliteBesideExecutable" BeforeTargets="_ComputeFilesToBundle">
+    <ItemGroup>
+      <ResolvedFileToPublish Update="@(ResolvedFileToPublish)"
+          Condition="'%(ResolvedFileToPublish.RelativePath)' == 'en\NxDrawingPdfExporter.App.resources.dll'">
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
 </Project>
