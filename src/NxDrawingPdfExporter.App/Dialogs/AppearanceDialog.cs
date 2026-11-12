@@ -1,20 +1,21 @@
 using NxDrawingPdfExporter.App.Configuration;
+using NxDrawingPdfExporter.App.Controls;
 using NxDrawingPdfExporter.App.Localization;
 using NxDrawingPdfExporter.App.Theming;
 
 namespace NxDrawingPdfExporter.App.Dialogs;
 
-internal sealed class AppearanceDialog : Form
+internal sealed class AppearanceDialog : SkinDialog
 {
     private readonly UiText ui;
     private readonly IReadOnlyList<ThemeDefinition> themes;
     private readonly ImportedImageStore imported;
     private readonly Dictionary<string, ThemeParameters> values;
     private readonly Action<string, ThemeParameters, string?> preview;
-    private readonly ComboBox choices = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly SkinComboBox choices = new() { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly PictureBox thumbnail = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom };
     private readonly TrackBar[] sliders;
-    private readonly Button apply = new() { AutoSize = true };
+    private readonly SkinButton apply = new() { AutoSize = true };
     private bool updating;
     private bool importing;
 
@@ -41,7 +42,7 @@ internal sealed class AppearanceDialog : Form
         MaximizeBox = false;
         AutoScaleMode = AutoScaleMode.Dpi;
         ClientSize = new Size(620, 445);
-        var layout = new TableLayoutPanel { ColumnCount = 2, RowCount = 4, Dock = DockStyle.Fill, Padding = new Padding(12) };
+        var layout = new SkinSurface { ColumnCount = 2, RowCount = 4, Dock = DockStyle.Fill, Padding = new Padding(12) };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -56,13 +57,13 @@ internal sealed class AppearanceDialog : Form
                 args.Value = ui.Get("Theme." + definition.Id);
         };
         choices.Items.AddRange(themes.Cast<object>().ToArray());
-        var importButton = new Button { Text = ui.Get("Import"), AutoSize = true, Anchor = AnchorStyles.Right };
+        var importButton = new SkinButton { Text = ui.Get("Import"), AutoSize = true, Anchor = AnchorStyles.Right };
         importButton.Click += async (_, _) => await ImportAsync(importButton);
         layout.Controls.Add(choices, 0, 0);
         layout.Controls.Add(importButton, 1, 0);
         layout.Controls.Add(thumbnail, 0, 1);
 
-        var effects = new TableLayoutPanel { ColumnCount = 2, Dock = DockStyle.Fill, AutoScroll = true };
+        var effects = new SkinSurface { ColumnCount = 2, Dock = DockStyle.Fill, AutoScroll = true };
         effects.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         effects.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         sliders = Parameters.Select((key, index) =>
@@ -82,12 +83,12 @@ internal sealed class AppearanceDialog : Form
         }).ToArray();
         layout.Controls.Add(effects, 1, 1);
 
-        var reset = new Button { Text = ui.Get("RestoreTheme"), AutoSize = true };
+        var reset = new SkinButton { Text = ui.Get("RestoreTheme"), AutoSize = true };
         reset.Click += (_, _) => { values.Remove(ThemeId); LoadChoice(); };
         apply.Text = ui.Get("Apply");
         apply.Click += (_, _) => DialogResult = DialogResult.OK;
-        var cancel = new Button { Text = ui.Get("Cancel"), AutoSize = true, DialogResult = DialogResult.Cancel };
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft };
+        var cancel = new SkinButton { Text = ui.Get("Cancel"), AutoSize = true, DialogResult = DialogResult.Cancel };
+        var actions = new SkinFlowPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft };
         actions.Controls.AddRange([cancel, apply, reset]);
         layout.Controls.Add(actions, 0, 3);
         layout.SetColumnSpan(actions, 2);

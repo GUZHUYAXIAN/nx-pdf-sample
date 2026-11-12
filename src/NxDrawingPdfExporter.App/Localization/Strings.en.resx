@@ -179,4 +179,6 @@
   <data name="NxIssue.SettingsUnavailable" xml:space="preserve"><value>NX settings could not be read.</value></data>
   <data name="PreflightHeight" xml:space="preserve"><value>Resize preflight. Drag down to grow or use the arrow keys.</value></data>
   <data name="ResultsHeight" xml:space="preserve"><value>Resize results. Drag up to grow or use the arrow keys.</value></data>
+  <data name="VerticalTableScroll" xml:space="preserve"><value>Vertical table scroll</value></data>
+  <data name="HorizontalTableScroll" xml:space="preserve"><value>Horizontal table scroll</value></data>
 </root>

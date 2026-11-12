@@ -1,4 +1,6 @@
 using NxDrawingPdfExporter.Contracts;
+using NxDrawingPdfExporter.App.Controls;
+using NxDrawingPdfExporter.App.Theming;
 using NxDrawingPdfExporter.Core.Input;
 using NxDrawingPdfExporter.Core.Output;
 
@@ -7,7 +9,7 @@ namespace NxDrawingPdfExporter.App;
 public sealed partial class MainForm
 {
     private sealed record GridRow(string Source, string Target, string Group, string Status, string Reason,
-        string Technical = "", PlannedOutputItem? Plan = null);
+        string Technical = "", PlannedOutputItem? Plan = null, SkinTextRole Role = SkinTextRole.Body);
 
     private IReadOnlyDictionary<string, (int Ordinal, string Group)> runRows =
         new Dictionary<string, (int, string)>(StringComparer.OrdinalIgnoreCase);
@@ -146,8 +148,9 @@ public sealed partial class MainForm
 
     private void AddOutputRow(SourceDirectoryGroup? group, string current)
     {
-        var row = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 4,
-            Margin = new Padding(1, 2, 1, 2), Padding = new Padding(4), Tag = group };
+        var row = new SkinSurface { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 4,
+            Margin = new Padding(1, 2, 1, 2), Padding = new Padding(4), Tag = group,
+            GroupTint = group is null ? Color.Empty : GroupTint(group.Label) };
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, (group is null ? 135 : 175) * DeviceDpi / 96));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -159,7 +162,7 @@ public sealed partial class MainForm
         UpdateCaption();
         if (group is not null)
             hints.SetToolTip(caption, group.Key);
-        var path = new TextBox { Text = current, Dock = DockStyle.Fill, AccessibleName = Ui.Get("Target") };
+        var path = new SkinTextBox { Text = current, Dock = DockStyle.Fill, AccessibleName = Ui.Get("Target") };
         hints.SetToolTip(path, current);
         path.TextChanged += (_, _) =>
         {
@@ -174,14 +177,14 @@ public sealed partial class MainForm
             UpdateCaption();
             InvalidatePlan();
         };
-        var browse = new Button { Text = Ui.Get("Browse"), AutoSize = true, FlatStyle = FlatStyle.Flat };
+        var browse = new SkinButton { Text = Ui.Get("Browse"), AutoSize = true, FlatStyle = FlatStyle.Flat };
         browse.Click += (_, _) => { if (TryBrowse(path.Text, out var chosen)) path.Text = chosen; };
         row.Controls.Add(caption, 0, 0);
         row.Controls.Add(path, 1, 0);
         row.Controls.Add(browse, 2, 0);
         if (group is not null)
         {
-            var reset = new Button { Text = Ui.Get("RestoreFolder"), AutoSize = true, FlatStyle = FlatStyle.Flat };
+            var reset = new SkinButton { Text = Ui.Get("RestoreFolder"), AutoSize = true, FlatStyle = FlatStyle.Flat };
             reset.Click += (_, _) => path.Text = group.Key;
             row.Controls.Add(reset, 3, 0);
         }
@@ -257,15 +260,15 @@ public sealed partial class MainForm
             return;
         }
 
-        using var dialog = new Form { Text = Ui.Get("BatchRev"), AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        using var dialog = new SkinDialog { Text = Ui.Get("BatchRev"), AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
             StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, Font = Font,
             MaximizeBox = false, MinimizeBox = false, Padding = new Padding(10) };
         var content = Flow();
         content.FlowDirection = FlowDirection.TopDown;
-        var entry = new TextBox { Width = 200, AccessibleName = Ui.Get("Rev") };
+        var entry = new SkinTextBox { Width = 200, AccessibleName = Ui.Get("Rev") };
         var hint = new Label { AutoSize = true, Text = Ui.Get("RevisionInput") };
-        var ok = new Button { Text = Ui.Get("Apply"), AutoSize = true };
-        var cancelEdit = new Button { Text = Ui.Get("Cancel"), AutoSize = true, DialogResult = DialogResult.Cancel };
+        var ok = new SkinButton { Text = Ui.Get("Apply"), AutoSize = true };
+        var cancelEdit = new SkinButton { Text = Ui.Get("Cancel"), AutoSize = true, DialogResult = DialogResult.Cancel };
         var buttons = Flow();
         buttons.Controls.AddRange([ok, cancelEdit]);
         content.Controls.AddRange([hint, entry, buttons]);
@@ -283,7 +286,7 @@ public sealed partial class MainForm
             controller.Session.SetRevisions(selected.Select(row => row.Source).ToArray(), entry.Text);
             dialog.DialogResult = DialogResult.OK;
         };
-        if (dialog.ShowDialog(this) == DialogResult.OK)
+        if (ShowSkinDialog(dialog, this) == DialogResult.OK)
         {
             RenderPlan();
             UpdateDynamicState();
@@ -337,7 +340,9 @@ public sealed partial class MainForm
                 : item.ReasonCode != ResultReasons.Ready ? Ui.Reason(item.ReasonCode)
                 : Ui.Get(item.PublishIntent == PlannedPublishIntent.ReplaceExpected ? "Replace" : "Create");
             var reason = Ui.Reason(item.ReasonCode, item.ReasonArguments);
-            var row = new GridRow(item.SourcePath, item.FinalOutputPath, group, status, reason, item.TechnicalDetails, item);
+            var role = invalid is not null && revision.Checked || item.IsBlocking ? SkinTextRole.Error
+                : controller.Session.IsStale || item.IsSkipped ? SkinTextRole.Warning : SkinTextRole.Body;
+            var row = new GridRow(item.SourcePath, item.FinalOutputPath, group, status, reason, item.TechnicalDetails, item, role);
             return (row, new object?[] { item.SourceOrdinal, group, Path.GetFileName(item.SourcePath),
                 Path.GetFileName(item.FinalOutputPath), status, invalid ?? (controller.Session.ManualRevision(item.SourcePath) ?? item.ChosenRevision)?.ToString() });
         }));
@@ -361,7 +366,13 @@ public sealed partial class MainForm
             var plan = controller.Session.CurrentPlan?.Items.FirstOrDefault(p =>
                 string.Equals(p.SourcePath, item.SourcePath, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(p.FinalOutputPath, item.FinalOutputPath, StringComparison.OrdinalIgnoreCase));
-            var row = new GridRow(item.SourcePath, item.FinalOutputPath, known.Item2, label, reason, item.TechnicalDetails, plan);
+            var role = item.Status switch
+            {
+                FileResultStatus.Success or FileResultStatus.Overwritten => SkinTextRole.Success,
+                FileResultStatus.Failed or FileResultStatus.NameConflict => SkinTextRole.Error,
+                _ => SkinTextRole.Warning
+            };
+            var row = new GridRow(item.SourcePath, item.FinalOutputPath, known.Item2, label, reason, item.TechnicalDetails, plan, role);
             return (row, new object?[] { known.Item1, known.Item2, Path.GetFileName(item.SourcePath),
                 Path.GetFileName(item.FinalOutputPath), label });
         }));
@@ -445,25 +456,25 @@ public sealed partial class MainForm
         }
         if (!string.IsNullOrEmpty(row.Technical))
             lines.AddRange(["", row.Technical]);
-        using var dialog = new Form { Text = Ui.Get("Detail"), Font = Font, Size = new Size(740, 510), MinimumSize = new Size(400, 300),
+        using var dialog = new SkinDialog { Text = Ui.Get("Detail"), Font = Font, Size = new Size(740, 510), MinimumSize = new Size(400, 300),
             StartPosition = FormStartPosition.CenterParent, MinimizeBox = false, Padding = new Padding(10) };
-        var display = new TextBox { Dock = DockStyle.Fill, ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical, Lines = lines.ToArray() };
+        var display = new SkinTextBox { Dock = DockStyle.Fill, ReadOnly = true, Multiline = true, ScrollBars = ScrollBars.Vertical, Lines = lines.ToArray() };
         var actions = Flow();
         actions.Dock = DockStyle.Bottom;
-        var copy = new Button { Text = Ui.Get("Copy"), AutoSize = true };
+        var copy = new SkinButton { Text = Ui.Get("Copy"), AutoSize = true };
         copy.Click += (_, _) =>
         {
             try { Clipboard.SetText(string.Join(Environment.NewLine, new[] { row.Source, row.Target }.Where(path => path.Length > 0))); }
             catch (System.Runtime.InteropServices.ExternalException error) { Notify("Copy", details: error.Message); }
         };
-        var folder = new Button { Text = Ui.Get("Folder"), AutoSize = true };
+        var folder = new SkinButton { Text = Ui.Get("Folder"), AutoSize = true };
         folder.Click += (_, _) => PickFolder([row], dialog);
-        var close = new Button { Text = Ui.Get("Close"), AutoSize = true, DialogResult = DialogResult.Cancel };
+        var close = new SkinButton { Text = Ui.Get("Close"), AutoSize = true, DialogResult = DialogResult.Cancel };
         actions.Controls.AddRange([copy, folder, close]);
         dialog.Controls.Add(display);
         dialog.Controls.Add(actions);
         dialog.CancelButton = close;
-        dialog.ShowDialog(this);
+        ShowSkinDialog(dialog, this);
     }
 
     private void OpenSelectedFolder() => PickFolder(lastGrid is null ? [] : SelectedRows(lastGrid), this);
@@ -482,29 +493,34 @@ public sealed partial class MainForm
             OpenFolder(directories[0]);
             return;
         }
-        using var dialog = new Form { Text = Ui.Get("ChooseFolder"), Font = Font, StartPosition = FormStartPosition.CenterParent,
+        using var dialog = new SkinDialog { Text = Ui.Get("ChooseFolder"), Font = Font, StartPosition = FormStartPosition.CenterParent,
             ClientSize = new Size(640, 220), MinimizeBox = false, MaximizeBox = false };
         var list = new ListBox { Dock = DockStyle.Fill, HorizontalScrollbar = true };
         list.Items.AddRange(directories);
-        var open = new Button { Text = Ui.Get("Folder"), Dock = DockStyle.Bottom, AutoSize = true, Enabled = false };
+        var open = new SkinButton { Text = Ui.Get("Folder"), Dock = DockStyle.Bottom, AutoSize = true, Enabled = false };
         list.SelectedIndexChanged += (_, _) => open.Enabled = list.SelectedIndex >= 0;
         open.Click += (_, _) => dialog.DialogResult = DialogResult.OK;
         dialog.Controls.Add(list);
         dialog.Controls.Add(open);
         dialog.AcceptButton = open;
-        if (dialog.ShowDialog(owner) == DialogResult.OK && list.SelectedItem is string path)
+        if (ShowSkinDialog(dialog, owner) == DialogResult.OK && list.SelectedItem is string path)
             OpenFolder(path);
+    }
+
+    private static Color GroupTint(string label)
+    {
+        if (label.Length == 0 || SystemInformation.HighContrast)
+            return Color.Empty;
+        var palette = SkinMaterials.GroupColors;
+        var index = label.Aggregate(0, (acc, c) => (acc * 26 + c - 'A' + 1) % palette.Length);
+        return palette[(index + palette.Length - 1) % palette.Length];
     }
 
     private Color GroupColor(string label)
     {
-        if (label.Length == 0 || SystemInformation.HighContrast)
-            return Color.Empty;
-        var palette = new[] { Color.FromArgb(229, 240, 252), Color.FromArgb(230, 244, 233), Color.FromArgb(249, 235, 225),
-            Color.FromArgb(239, 231, 250), Color.FromArgb(251, 242, 215), Color.FromArgb(243, 231, 239) };
-        var index = label.Aggregate(0, (acc, c) => (acc * 26 + c - 'A' + 1) % palette.Length);
-        var color = palette[(index + palette.Length - 1) % palette.Length];
-        CustomizeGroupColor(ref color);
+        var color = GroupTint(label);
+        if (!color.IsEmpty)
+            CustomizeGroupColor(ref color);
         return color;
     }
 

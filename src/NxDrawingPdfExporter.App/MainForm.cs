@@ -159,8 +159,8 @@ public sealed partial class MainForm : Form
         AddItem(help, "Guide", () => Notify("GuideBody", "Guide"));
         AddItem(help, "RevisionRules", () => Notify("RevisionBody", "RevisionRules"));
         AddItem(help, "Log", OpenLog);
-        AddItem(help, "About", () => MessageBox.Show(this, Ui.Get("Title") + " " +
-            typeof(MainForm).Assembly.GetName().Version?.ToString(3), Ui.Get("About")));
+        AddItem(help, "About", () => ShowNotice(this, Ui.Get("About"), Ui.Get("Title") + " " +
+            typeof(MainForm).Assembly.GetName().Version?.ToString(3)));
     }
 
     private ToolStripMenuItem MenuRoot(string key)
@@ -188,8 +188,6 @@ public sealed partial class MainForm : Form
 
     private void SetLanguage(string language)
     {
-        if (!CommitRevisionEdit())
-            return;
         settings = settings with { Language = language };
         Ui.Language = language;
         SaveSettings();
@@ -203,8 +201,11 @@ public sealed partial class MainForm : Form
         foreach (var (item, key) in menuLabels)
             item.Text = Ui.Get(key);
         foreach (var grid in new[] { preflight, results, manualGrid })
+        {
+            grid.NameScrollBars(Ui.Get("VerticalTableScroll"), Ui.Get("HorizontalTableScroll"));
             foreach (DataGridViewColumn column in grid.Columns)
                 column.HeaderText = Ui.Get(column.Name);
+        }
         search.PlaceholderText = Ui.Get("Search");
         search.AccessibleName = Ui.Get("Search");
         preflightGrip.AccessibleName = Ui.Get("PreflightHeight");
@@ -342,8 +343,8 @@ public sealed partial class MainForm : Form
     }
 
     private void Notify(string key, string? title = null, string? details = null) =>
-        MessageBox.Show(this, Ui.Get(key) + (string.IsNullOrWhiteSpace(details) ? "" : Environment.NewLine + details),
-            Ui.Get(title ?? "Title"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+        ShowNotice(this, Ui.Get(title ?? "Title"),
+            Ui.Get(key) + (string.IsNullOrWhiteSpace(details) ? "" : Environment.NewLine + details));
 
     private void OpenLog()
     {

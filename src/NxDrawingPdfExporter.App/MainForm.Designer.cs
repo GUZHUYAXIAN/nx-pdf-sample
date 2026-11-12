@@ -7,42 +7,42 @@ namespace NxDrawingPdfExporter.App;
 public sealed partial class MainForm
 {
     private readonly MenuStrip menu = new() { Dock = DockStyle.Fill, GripStyle = ToolStripGripStyle.Hidden, Padding = new Padding(10, 3, 10, 3) };
-    private readonly TableLayoutPanel shell = new() { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(12, 6, 12, 8), BackColor = Color.Transparent };
-    private readonly Panel workspaceViewport = new() { Dock = DockStyle.Fill, AutoScroll = true, Margin = new Padding(0) };
-    private readonly TableLayoutPanel workspace = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, Margin = new Padding(0) };
+    private readonly SkinSurface shell = new() { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(12, 6, 12, 8), BackColor = Color.Transparent };
+    private readonly SkinWorkspaceViewport workspaceViewport = new() { Dock = DockStyle.Fill, AutoScroll = true, Margin = new Padding(0) };
+    private readonly SkinSurface workspace = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, Margin = new Padding(0) };
     private readonly HeightResizeGrip preflightGrip = MakeGrip(false);
     private readonly HeightResizeGrip resultsGrip = MakeGrip(true);
-    private readonly TableLayoutPanel settingsPanel = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Padding = new Padding(10, 5, 10, 5) };
+    private readonly SkinSurface settingsPanel = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Padding = new Padding(10, 5, 10, 5) };
     private readonly FlowLayoutPanel nxLine = Flow();
     private readonly Label nxStatus = Caption();
-    private readonly ComboBox nxCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 350 };
+    private readonly SkinComboBox nxCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 350 };
     private readonly FlowLayoutPanel inputLine = Flow();
     private readonly RadioButton scanMode = Radio();
     private readonly RadioButton manualMode = Radio();
     private readonly CheckBox recursive = new() { AutoSize = true };
-    private readonly TextBox scanPath = new() { Dock = DockStyle.Fill, AccessibleName = "PRT" };
-    private readonly TableLayoutPanel scanLine = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
+    private readonly SkinTextBox scanPath = new() { Dock = DockStyle.Fill, AccessibleName = "PRT" };
+    private readonly SkinSurface scanLine = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
     private readonly FlowLayoutPanel manualLine = Flow();
-    private readonly WorkspaceGrid manualGrid = MakeGrid();
+    private readonly SkinDataGridView manualGrid = MakeGrid();
     private readonly FlowLayoutPanel outputModeLine = Flow();
     private readonly RadioButton groupMode = Radio();
     private readonly RadioButton unifiedMode = Radio();
-    private readonly TableLayoutPanel outputRows = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1 };
+    private readonly SkinSurface outputRows = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1 };
     private readonly FlowLayoutPanel policyLine = Flow();
     private readonly RadioButton skip = Radio();
     private readonly RadioButton overwrite = Radio();
     private readonly RadioButton revision = Radio();
     private readonly FlowLayoutPanel reviewTools = Flow();
     private readonly FlowLayoutPanel resultTools = Flow();
-    private readonly TextBox search = new() { Width = 190 };
+    private readonly SkinTextBox search = new() { Width = 190 };
     private readonly CheckBox problems = new() { AutoSize = true };
     private readonly Label visibleCount = Caption();
     private readonly Label settingsSummary = Caption();
     private readonly Label progressText = Caption();
     private readonly Label summary = Caption();
     private readonly ProgressBar progress = new() { Height = 5, Dock = DockStyle.Fill, Margin = new Padding(4, 2, 4, 0) };
-    private readonly WorkspaceGrid preflight = MakeGrid();
-    private readonly WorkspaceGrid results = MakeGrid();
+    private readonly SkinDataGridView preflight = MakeGrid();
+    private readonly SkinDataGridView results = MakeGrid();
     private readonly ToolTip hints = new() { AutoPopDelay = 15000, InitialDelay = 400 };
     private Button start = null!;
     private Button cancel = null!;
@@ -124,7 +124,7 @@ public sealed partial class MainForm
         cancel = ButtonFor("Cancel", RequestCancel);
         progressText.Margin = new Padding(10, 8, 2, 2);
         actions.Controls.AddRange([start, cancel, progressText]);
-        var bottom = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 2, Padding = new Padding(4) };
+        var bottom = new SkinSurface { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 2, Padding = new Padding(4), Header = true };
         bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         bottom.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         bottom.RowStyles.Add(new RowStyle(SizeType.Absolute, 9));
@@ -141,7 +141,7 @@ public sealed partial class MainForm
         ResumeLayout();
     }
 
-    private static FlowLayoutPanel Flow() => new()
+    private static SkinFlowPanel Flow() => new()
     {
         Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
         Margin = new Padding(0), Padding = new Padding(2), WrapContents = true
@@ -152,20 +152,20 @@ public sealed partial class MainForm
 
     private Button ButtonFor(string key, Action action)
     {
-        var button = new Button { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(6, 1, 6, 1), FlatStyle = FlatStyle.Flat };
+        var button = new SkinButton { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(6, 1, 6, 1), FlatStyle = FlatStyle.Flat };
         button.Click += (_, _) => action();
         Localize(button, key);
         return button;
     }
 
-    private static WorkspaceGrid MakeGrid() => new()
+    private static SkinDataGridView MakeGrid() => new()
     {
         Dock = DockStyle.Top, Margin = new Padding(0), BorderStyle = BorderStyle.None, AllowUserToAddRows = false,
         AllowUserToDeleteRows = false, AllowUserToResizeRows = false, RowHeadersVisible = false,
         SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = true,
         AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCellsExceptHeaders,
         ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
-        EnableHeadersVisualStyles = false, CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+        EnableHeadersVisualStyles = false, ShowCellToolTips = false, CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
         DefaultCellStyle = new DataGridViewCellStyle { WrapMode = DataGridViewTriState.True, Padding = new Padding(6, 4, 6, 4) }
     };
 
@@ -174,6 +174,7 @@ public sealed partial class MainForm
         foreach (var (key, width) in columns)
             grid.Columns.Add(new DataGridViewTextBoxColumn
             {
+                CellTemplate = key == "Rev" ? new SkinEditCell() : new DataGridViewTextBoxCell(),
                 Name = key, Width = width, MinimumWidth = 45, ReadOnly = true,
                 SortMode = DataGridViewColumnSortMode.NotSortable
             });

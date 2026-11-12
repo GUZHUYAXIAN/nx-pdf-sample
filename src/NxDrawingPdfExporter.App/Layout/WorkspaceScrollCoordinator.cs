@@ -21,7 +21,8 @@ internal sealed class WorkspaceScrollCoordinator : IMessageFilter, IDisposable
     public bool PreFilterMessage(ref Message message)
     {
         const int mouseWheel = 0x020A;
-        if (message.Msg != mouseWheel || root.IsDisposed || Form.ActiveForm != root)
+        if (message.Msg != mouseWheel || root.IsDisposed || Form.ActiveForm != root
+            || Control.ModifierKeys != Keys.None || Control.MouseButtons != MouseButtons.None)
             return false;
 
         var packed = message.LParam.ToInt64();
@@ -54,6 +55,7 @@ internal sealed class WorkspaceScrollCoordinator : IMessageFilter, IDisposable
             var distance = lines < 0 ? viewport.ClientSize.Height : lines * Math.Max(1, root.Font.Height);
             viewport.AutoScrollPosition = new Point(-viewport.AutoScrollPosition.X,
                 Math.Max(0, -viewport.AutoScrollPosition.Y - ticks * distance));
+            viewport.Invalidate(true);
         }
         return true;
     }

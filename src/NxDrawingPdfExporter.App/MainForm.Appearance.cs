@@ -1,6 +1,6 @@
-using System.Drawing.Drawing2D;
 using NxDrawingPdfExporter.App.Configuration;
 using NxDrawingPdfExporter.App.Dialogs;
+using NxDrawingPdfExporter.App.Controls;
 using NxDrawingPdfExporter.App.Theming;
 using NxDrawingPdfExporter.Core.Input;
 
@@ -10,38 +10,66 @@ public sealed partial class MainForm
 {
     private IReadOnlyList<ThemeDefinition> themes = [];
     private readonly ImportedImageStore importedImages = new(Path.Combine(JsonUiSettingsStore.LocalRoot, "theme-images"));
-    private readonly System.Windows.Forms.Timer paintDelay = new() { Interval = 120 };
-    private ThemeDefinition? activeTheme;
-    private ThemeParameters activeEffects = new();
-    private string? activeImagePath;
-    private int paintVersion;
-    private bool painting;
+    private ThemeRenderCoordinator? themeRenderer;
+    private WindowBackdrop? backdrop;
+    private ThemeFrame? frame;
+    private ThemeFrame? prePreviewFrame;
+    private (ThemeDefinition Theme, ThemeParameters Effects, string? Path) appearance;
+    private long themeRevision;
     private bool themeWarningShown;
-    private Bitmap? workspaceBackground;
+    private bool previousHighContrast;
+    private AppearanceDialog? appearanceDialog;
+    private WindowBackdrop? dialogBackdrop;
 
     partial void InitializeAppearance()
     {
         themes = ThemeCatalog.Load(AppContext.BaseDirectory);
-        paintDelay.Tick += async (_, _) => await PaintBackgroundAsync();
-        ClientSizeChanged += (_, _) => SchedulePaint();
-        ApplyAppearance(settings.ThemeId, settings.ThemeParametersById.GetValueOrDefault(settings.ThemeId), settings.ImportedImage);
-        FormClosed += (_, _) =>
+        backdrop = new(this, () => frame);
+        themeRenderer = new(ThemeFrame.Render, AcceptFrame, OnThemeFailure, TimeSpan.FromMilliseconds(100));
+        previousHighContrast = SystemInformation.HighContrast;
+        var theme = themes.First(definition => definition.Id == "cloud");
+        frame = new(new(0, null, new Size(1, 1), theme, theme.Defaults, previousHighContrast), null, null);
+        BindSkinControls();
+        RefreshThemeColors();
+        ClientSizeChanged += (_, _) => RequestThemeFrame();
+        DpiChanged += (_, _) => RequestThemeFrame();
+        SystemColorsChanged += (_, _) =>
         {
-            paintDelay.Dispose();
-            workspaceBackground?.Dispose();
+            var highContrast = SystemInformation.HighContrast;
+            if (previousHighContrast != highContrast)
+            {
+                previousHighContrast = highContrast;
+                RequestThemeFrame();
+            }
+            else
+                RefreshThemeColors();
+        };
+        Shown += (_, _) => ApplySavedAppearance();
+        Disposed += (_, _) =>
+        {
+            themeRenderer.Dispose();
+            frame?.Dispose();
+            prePreviewFrame?.Dispose();
             hints.Dispose();
         };
     }
 
+    private void ApplySavedAppearance() =>
+        ApplyAppearance(settings.ThemeId, settings.ThemeParametersById.GetValueOrDefault(settings.ThemeId), settings.ImportedImage);
+
     partial void OpenAppearance()
     {
-        if (!CommitRevisionEdit())
-            return;
-        var before = settings;
-        using var dialog = new AppearanceDialog(Ui, before, themes, importedImages,
+        var before = appearance;
+        prePreviewFrame = frame;
+        using var dialog = new AppearanceDialog(Ui, settings, themes, importedImages,
             (id, effects, image) => ApplyAppearance(id, effects, image)) { Font = Font };
-        ApplyControlPalette(dialog, CurrentPalette());
-        if (dialog.ShowDialog(this) == DialogResult.OK)
+        appearanceDialog = dialog;
+        dialogBackdrop = new(dialog, () => frame);
+        ThemeControlStyler.Apply(dialog, CurrentPalette(), dialogBackdrop);
+        var result = dialog.ShowDialog(this);
+        appearanceDialog = null;
+        dialogBackdrop = null;
+        if (result == DialogResult.OK)
         {
             settings = settings with
             {
@@ -50,102 +78,86 @@ public sealed partial class MainForm
                 ImportedImage = dialog.ImageReference
             };
             SaveSettings();
+            if (!ReferenceEquals(prePreviewFrame, frame))
+                prePreviewFrame?.Dispose();
+            prePreviewFrame = null;
+            ApplySavedAppearance();
         }
-        ApplyAppearance(settings.ThemeId, settings.ThemeParametersById.GetValueOrDefault(settings.ThemeId), settings.ImportedImage);
+        else
+        {
+            themeRenderer?.Cancel();
+            appearance = before;
+            var restore = prePreviewFrame;
+            prePreviewFrame = null;
+            if (restore is not null && restore.Request.HighContrast == SystemInformation.HighContrast)
+                AcceptFrame(restore);
+            else
+                restore?.Dispose();
+            RequestThemeFrame();
+        }
     }
 
     private void ApplyAppearance(string id, ThemeParameters? effects, string? reference)
     {
         var theme = themes.FirstOrDefault(theme => theme.Id == id) ?? themes[0];
-        var imagePath = id == "imported" ? importedImages.Resolve(reference) : theme.ImagePath;
-        if (!theme.HasAssets || (theme.IsImageTheme && imagePath is null))
+        var path = id == "imported" ? importedImages.Resolve(reference) : theme.ImagePath;
+        if (!theme.HasAssets || (theme.IsImageTheme && path is null))
         {
-            FallBackTheme();
+            themeRenderer?.Cancel();
+            WarnThemeUnavailable();
             return;
         }
-        activeTheme = theme;
-        activeEffects = effects ?? theme.Defaults;
-        activeImagePath = imagePath;
-        RefreshThemeColors();
-        SchedulePaint();
+        appearance = (theme, (effects ?? theme.Defaults).Normalize(), path);
+        RequestThemeFrame();
     }
 
-    private void FallBackTheme()
+    private void RequestThemeFrame()
     {
-        activeTheme = themes[0];
-        activeImagePath = null;
-        RefreshThemeColors();
-        SchedulePaint();
-        if (!themeWarningShown)
-        {
-            themeWarningShown = true;
-            if (IsHandleCreated)
-                BeginInvoke(() => Notify("ThemeUnavailable"));
-            else
-                Shown += (_, _) => Notify("ThemeUnavailable");
-        }
-    }
-
-    private void SchedulePaint()
-    {
-        paintVersion++;
-        if (IsDisposed)
+        if (themeRenderer is null || appearance.Theme is null || !IsHandleCreated || IsDisposed)
             return;
-        if (activeImagePath is null || activeEffects.ImageVisibility == 0 || SystemInformation.HighContrast)
+        var (theme, effects, path) = appearance;
+        var highContrast = SystemInformation.HighContrast;
+        var size = BoundedSize(ClientSize);
+        var previous = frame?.Request;
+        var sameAppearance = previous is not null && previous.Theme == theme && previous.Effects == effects
+            && previous.ImagePath == path && previous.HighContrast == highContrast;
+        if (sameAppearance && previous!.PixelSize == size)
         {
-            SwapBackground(null);
+            themeRenderer.Cancel();
             return;
         }
-        if (IsHandleCreated)
+        var request = new ThemeRenderRequest(++themeRevision, path, size, theme, effects, highContrast,
+            sameAppearance ? frame?.Palette : null);
+        if (highContrast || path is null || effects.ImageVisibility == 0)
         {
-            paintDelay.Stop();
-            paintDelay.Start();
+            themeRenderer.Cancel();
+            AcceptFrame(new(request, null, null));
         }
         else
-            Shown += (_, _) => SchedulePaint();
+            _ = themeRenderer.Request(request);
     }
 
-    private async Task PaintBackgroundAsync()
+    private void AcceptFrame(ThemeFrame next)
     {
-        paintDelay.Stop();
-        if (painting || activeTheme is null || activeImagePath is null || IsDisposed)
+        var previous = frame;
+        frame = next;
+        if (!ReferenceEquals(previous, prePreviewFrame) && !ReferenceEquals(previous, next))
+            previous?.Dispose();
+        RefreshThemeColors();
+    }
+
+    private void OnThemeFailure(Exception error)
+    {
+        System.Diagnostics.Debug.WriteLine(error);
+        WarnThemeUnavailable();
+    }
+
+    private void WarnThemeUnavailable()
+    {
+        if (themeWarningShown || IsDisposed || !IsHandleCreated)
             return;
-        painting = true;
-        var version = paintVersion;
-        var path = activeImagePath;
-        var theme = activeTheme;
-        var effects = activeEffects;
-        var canvas = BoundedSize(ClientSize);
-        try
-        {
-            var images = await Task.Run(() =>
-            {
-                using var source = new Bitmap(path);
-                return BackgroundRenderer.Render(source, canvas, theme, effects);
-            });
-            if (!IsDisposed && version == paintVersion)
-                SwapBackground(images);
-            else
-            {
-                images.Dispose();
-            }
-        }
-        catch (Exception error) when (error is ArgumentException or IOException or UnauthorizedAccessException
-            or OutOfMemoryException or System.Runtime.InteropServices.ExternalException)
-        {
-            System.Diagnostics.Debug.WriteLine(error);
-            if (!IsDisposed && version == paintVersion)
-                FallBackTheme();
-        }
-        finally
-        {
-            painting = false;
-            if (!IsDisposed && version != paintVersion && activeImagePath is not null)
-            {
-                paintDelay.Stop();
-                paintDelay.Start();
-            }
-        }
+        themeWarningShown = true;
+        BeginInvoke(() => Notify("ThemeUnavailable"));
     }
 
     private static Size BoundedSize(Size size)
@@ -154,129 +166,140 @@ public sealed partial class MainForm
         return new Size(Math.Max(1, (int)(size.Width * scale)), Math.Max(1, (int)(size.Height * scale)));
     }
 
-    private void SwapBackground(Bitmap? background)
-    {
-        var old = workspaceBackground;
-        workspaceBackground = background;
-        old?.Dispose();
-        Invalidate(true);
-    }
-
     protected override void OnPaintBackground(PaintEventArgs args)
     {
         base.OnPaintBackground(args);
-        if (!SystemInformation.HighContrast && workspaceBackground is not null)
-        {
-            args.Graphics.InterpolationMode = InterpolationMode.HighQualityBilinear;
-            args.Graphics.DrawImage(workspaceBackground, ClientRectangle);
-        }
+        if (!SystemInformation.HighContrast)
+            backdrop?.PaintBackdrop(args.Graphics, args.ClipRectangle, Point.Empty);
     }
 
     private ThemeDefinition CurrentPalette()
     {
-        var theme = activeTheme ?? themes[0];
+        var theme = frame?.Request.Theme ?? themes[0];
         return SystemInformation.HighContrast
-            ? theme with { Background = SystemColors.Window, Surface = SystemColors.Window, Foreground = SystemColors.WindowText, Accent = SystemColors.Highlight }
+            ? theme with { Background = SystemColors.Window, Surface = SystemColors.Window,
+                Foreground = SystemColors.WindowText, Accent = SystemColors.Highlight }
             : theme;
+    }
+
+    private void BindSkinControls()
+    {
+        hints.OwnerDraw = true;
+        hints.Draw += (_, e) =>
+        {
+            using var background = new SolidBrush(hints.BackColor);
+            using var border = new Pen(hints.ForeColor);
+            e.Graphics.FillRectangle(background, e.Bounds);
+            e.Graphics.DrawRectangle(border, Rectangle.Inflate(e.Bounds, -1, -1));
+            e.DrawText(TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+        };
+        foreach (var grid in new[] { preflight, results, manualGrid })
+        {
+            grid.GroupTint = row => grid.Rows[row].Tag is GridRow data ? GroupTint(data.Group) : Color.Empty;
+            grid.RowStatus = row => grid.Rows[row].Tag is GridRow data ? data.Role : SkinTextRole.Body;
+            grid.CellMouseEnter += (_, e) =>
+            {
+                var cell = e.RowIndex >= 0 && e.ColumnIndex >= 0 ? grid[e.ColumnIndex, e.RowIndex] : null;
+                var text = cell is null ? "" : string.IsNullOrEmpty(cell.ErrorText) ? cell.ToolTipText : cell.ErrorText;
+                hints.SetToolTip(grid, text);
+            };
+            grid.MouseLeave += (_, _) => hints.SetToolTip(grid, "");
+        }
     }
 
     partial void RefreshThemeColors()
     {
-        if (themes.Count == 0 || activeTheme is null)
+        if (themes.Count == 0 || frame is null)
             return;
         var palette = CurrentPalette();
+        var materials = frame.Materials;
+        var sample = frame.Backdrop?.GetPixel(0, 0) ?? palette.Background;
         BackColor = palette.Background;
-        ApplyControlPalette(shell, palette);
-        shell.BackColor = Color.Transparent;
-        menu.Renderer = new ToolStripProfessionalRenderer(new ThemeMenuColors(palette)) { RoundedEdges = false };
-        ColorMenu(menu.Items, palette);
-        hints.BackColor = palette.Surface;
-        hints.ForeColor = palette.Foreground;
+        ThemeControlStyler.Apply(shell, palette, backdrop);
+        menu.Renderer = SystemInformation.HighContrast ? new ToolStripSystemRenderer()
+            : new SkinMenuRenderer(palette, backdrop) { RoundedEdges = false };
+        ColorMenu(menu.Items, materials?.Header.Foreground ?? palette.Foreground);
+        hints.BackColor = materials?.Header.Composite(sample) ?? palette.Surface;
+        hints.ForeColor = materials?.Header.Foreground ?? palette.Foreground;
         foreach (var grid in new[] { preflight, results, manualGrid })
         {
-            grid.BackgroundColor = palette.Surface;
-            grid.GridColor = Blend(palette.Surface, palette.Foreground, .15f);
-            grid.DefaultCellStyle.BackColor = palette.Surface;
-            grid.DefaultCellStyle.ForeColor = palette.Foreground;
+            grid.BackgroundColor = materials?.Body.Composite(sample) ?? palette.Surface;
+            grid.GridColor = ColorContrast.Over(palette.Surface, Color.FromArgb(38, palette.Foreground));
+            grid.DefaultCellStyle.BackColor = grid.BackgroundColor;
+            grid.DefaultCellStyle.ForeColor = materials?.Body.Foreground ?? palette.Foreground;
             grid.DefaultCellStyle.SelectionBackColor = palette.Accent;
-            grid.DefaultCellStyle.SelectionForeColor = Contrast(palette.Accent);
-            grid.ColumnHeadersDefaultCellStyle.BackColor = Blend(palette.Surface, palette.Foreground, .09f);
-            grid.ColumnHeadersDefaultCellStyle.ForeColor = palette.Foreground;
+            grid.DefaultCellStyle.SelectionForeColor = SystemInformation.HighContrast ? SystemColors.HighlightText
+                : ThemeControlStyler.SolidText(palette.Accent);
+            grid.ColumnHeadersDefaultCellStyle.BackColor = materials?.Header.Composite(sample)
+                ?? ColorContrast.Over(palette.Surface, Color.FromArgb(23, palette.Foreground));
+            grid.ColumnHeadersDefaultCellStyle.ForeColor = materials?.Header.Foreground ?? palette.Foreground;
             grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = grid.ColumnHeadersDefaultCellStyle.BackColor;
             foreach (DataGridViewRow row in grid.Rows)
-                row.DefaultCellStyle.BackColor = row.Tag is GridRow data ? GroupColor(data.Group) : Color.Empty;
+                row.DefaultCellStyle.BackColor = materials is null && row.Tag is GridRow data ? GroupColor(data.Group) : Color.Empty;
+            grid.RefreshSkin();
         }
-        foreach (Control row in outputRows.Controls)
-            if (row.Tag is SourceDirectoryGroup group)
-            {
-                var groupColor = GroupColor(group.Label);
-                row.BackColor = groupColor.IsEmpty ? palette.Surface : groupColor;
-                foreach (Control child in row.Controls)
-                    if (child is Label)
-                        child.BackColor = row.BackColor;
-            }
+        if (materials is null)
+        {
+            foreach (Control row in outputRows.Controls)
+                if (row.Tag is SourceDirectoryGroup group)
+                {
+                    var color = GroupColor(group.Label);
+                    row.BackColor = color.IsEmpty ? palette.Surface : color;
+                    foreach (Control child in row.Controls)
+                        if (child is Label)
+                            child.BackColor = row.BackColor;
+                }
+        }
+        if (appearanceDialog is { IsDisposed: false } dialog)
+            ThemeControlStyler.Apply(dialog, palette, dialogBackdrop);
         Invalidate(true);
     }
 
-    private static void ApplyControlPalette(Control root, ThemeDefinition palette)
-    {
-        root.ForeColor = palette.Foreground;
-        if (root is not PictureBox)
-            root.BackColor = palette.Surface;
-        if (root is Button button)
-        {
-            button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderColor = Blend(palette.Surface, palette.Foreground, .27f);
-            button.FlatAppearance.MouseOverBackColor = Blend(palette.Surface, palette.Accent, .2f);
-            if (Equals(button.Tag, "Primary"))
-            {
-                button.BackColor = palette.Accent;
-                button.ForeColor = Contrast(palette.Accent);
-                button.FlatAppearance.MouseOverBackColor = Blend(palette.Accent, palette.Surface, .14f);
-            }
-        }
-        foreach (Control control in root.Controls)
-            if (control is not ScrollBar)
-                ApplyControlPalette(control, palette);
-    }
-
-    private static void ColorMenu(ToolStripItemCollection items, ThemeDefinition palette)
+    private static void ColorMenu(ToolStripItemCollection items, Color foreground)
     {
         foreach (ToolStripItem item in items)
         {
-            item.BackColor = palette.Surface;
-            item.ForeColor = palette.Foreground;
+            item.BackColor = Color.Empty;
+            item.ForeColor = foreground;
             if (item is ToolStripDropDownItem dropdown)
-                ColorMenu(dropdown.DropDownItems, palette);
+                ColorMenu(dropdown.DropDownItems, foreground);
         }
+    }
+
+    private DialogResult ShowSkinDialog(SkinDialog dialog, IWin32Window owner)
+    {
+        ThemeControlStyler.Apply(dialog, CurrentPalette(), new WindowBackdrop(dialog, () => frame));
+        return dialog.ShowDialog(owner);
+    }
+
+    private void ShowNotice(IWin32Window owner, string title, string message)
+    {
+        using var notice = new SkinDialog
+        {
+            Text = title, Font = Font, StartPosition = FormStartPosition.CenterParent, ShowInTaskbar = false,
+            MinimizeBox = false, MaximizeBox = false, ClientSize = new Size(450, 190), Padding = new Padding(12),
+            AutoScaleMode = AutoScaleMode.Dpi
+        };
+        var text = new SkinTextBox
+        {
+            Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
+            BorderStyle = BorderStyle.None, Text = message
+        };
+        var controls = Flow();
+        controls.Dock = DockStyle.Bottom;
+        controls.FlowDirection = FlowDirection.RightToLeft;
+        var closeNotice = new SkinButton { Text = Ui.Get("Close"), AutoSize = true, DialogResult = DialogResult.OK };
+        controls.Controls.Add(closeNotice);
+        notice.Controls.Add(text);
+        notice.Controls.Add(controls);
+        notice.AcceptButton = closeNotice;
+        notice.CancelButton = closeNotice;
+        ShowSkinDialog(notice, owner);
     }
 
     partial void CustomizeGroupColor(ref Color color)
     {
-        if (activeTheme is { IsDark: true } theme)
-            color = Blend(theme.Surface, color, .16f);
-    }
-
-    private static Color Contrast(Color color) => (.2126 * color.R + .7152 * color.G + .0722 * color.B) >= 146
-        ? Color.FromArgb(18, 27, 42) : Color.White;
-
-    private static Color Blend(Color first, Color second, float amount) => Color.FromArgb(
-        (int)(first.R + (second.R - first.R) * amount),
-        (int)(first.G + (second.G - first.G) * amount),
-        (int)(first.B + (second.B - first.B) * amount));
-
-    private sealed class ThemeMenuColors(ThemeDefinition theme) : ProfessionalColorTable
-    {
-        public override Color MenuStripGradientBegin => theme.Surface;
-        public override Color MenuStripGradientEnd => theme.Surface;
-        public override Color ToolStripDropDownBackground => theme.Surface;
-        public override Color ImageMarginGradientBegin => theme.Surface;
-        public override Color ImageMarginGradientMiddle => theme.Surface;
-        public override Color ImageMarginGradientEnd => theme.Surface;
-        public override Color MenuItemSelected => Blend(theme.Surface, theme.Accent, .24f);
-        public override Color MenuItemBorder => Blend(theme.Surface, theme.Accent, .45f);
-        public override Color MenuBorder => Blend(theme.Surface, theme.Accent, .45f);
-        public override Color MenuItemPressedGradientBegin => theme.Surface;
-        public override Color MenuItemPressedGradientEnd => theme.Surface;
+        if (frame?.Request.Theme is { IsDark: true } theme)
+            color = ColorContrast.Over(theme.Surface, Color.FromArgb(41, color));
     }
 }

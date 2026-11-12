@@ -1,4 +1,5 @@
 using NxDrawingPdfExporter.App.Layout;
+using NxDrawingPdfExporter.App.Theming;
 
 namespace NxDrawingPdfExporter.App.Controls;
 
@@ -7,6 +8,7 @@ internal sealed class HeightResizeGrip(bool topHandle) : Control
     private int startHeight;
     private int startY;
     private bool dragging;
+    internal IBackdropSource? Backdrop;
 
     internal Func<int> CurrentHeightDip = () => 280;
     internal event Action<int>? HeightRequested;
@@ -56,6 +58,12 @@ internal sealed class HeightResizeGrip(bool topHandle) : Control
         var delta = (e.KeyCode == Keys.Up ? -1 : 1) * (e.Shift ? 40 : 12);
         HeightRequested?.Invoke(WorkspaceLayoutPolicy.ResizeHeightDip(CurrentHeightDip(), delta, 96, topHandle));
         e.SuppressKeyPress = true;
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        if (!SkinPainter.PaintSurface(this, Backdrop, e.Graphics, e.ClipRectangle, header: true))
+            base.OnPaintBackground(e);
     }
 
     protected override void OnPaint(PaintEventArgs e)
