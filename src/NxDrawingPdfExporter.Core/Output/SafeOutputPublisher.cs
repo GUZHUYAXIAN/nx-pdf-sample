@@ -82,6 +82,9 @@ public sealed class SafeOutputPublisher
             if (!expected.Matches(targets.Capture(backup)))
                 return Fail(request, PublicationOutcomeStatus.TargetChanged, "替换期间目标发生变化，请检查备份。", backup: backup);
 
+            // Keep the final name stable until inspection and backup cleanup are complete.
+            // A writer already holding an incompatible handle causes the backup to be retained.
+            using var protectedTarget = new FileStream(request.FinalOutputPath, FileMode.Open, FileAccess.Read, FileShare.Read);
             problem = ValidatePdfContent(request.FinalOutputPath, request.ExpectedPageCount);
             var published = targets.Capture(request.FinalOutputPath);
             if (problem is not null || !candidate.MatchesContent(published))

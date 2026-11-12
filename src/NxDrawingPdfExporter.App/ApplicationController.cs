@@ -128,6 +128,8 @@ namespace NxDrawingPdfExporter.App
 
         public string? CurrentRunDirectory { get; private set; }
 
+        public string? InputTechnicalDetails { get; private set; }
+
         public event Action? StateChanged;
 
         private void Raise() => StateChanged?.Invoke();
@@ -339,7 +341,7 @@ namespace NxDrawingPdfExporter.App
             UpdatePreflightInputs();
             if (Session.Inputs.Count == 0)
             {
-                SetProgress("NoInput");
+                SetProgress(InputTechnicalDetails is null ? "NoInput" : "InputFailed");
                 return;
             }
 
@@ -708,6 +710,9 @@ namespace NxDrawingPdfExporter.App
 
         private IReadOnlyList<string> CollectSources()
         {
+            InputTechnicalDetails = null;
+            if (InputMode == GuiInputMode.ScanFolder && string.IsNullOrWhiteSpace(ScanFolderPath))
+                return Array.Empty<string>();
             try
             {
                 return InputMode == GuiInputMode.ScanFolder
@@ -716,6 +721,7 @@ namespace NxDrawingPdfExporter.App
             }
             catch (Exception error)
             {
+                InputTechnicalDetails = error.Message;
                 log.Write("输入收集失败: " + SingleLine(error.Message));
                 SetProgress("InputFailed");
                 return Array.Empty<string>();

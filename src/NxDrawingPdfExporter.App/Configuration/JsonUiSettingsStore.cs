@@ -17,8 +17,18 @@ public sealed class JsonUiSettingsStore(string settingsPath)
     {
         try
         {
-            var settings = JsonSerializer.Deserialize<UiSettings>(File.ReadAllBytes(settingsPath), JsonOptions);
-            return settings is { SchemaVersion: 1 } ? (settings.Normalize(), false) : (new UiSettings(), true);
+            using var document = JsonDocument.Parse(File.ReadAllBytes(settingsPath));
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("schemaVersion", out var version)
+                || version.ValueKind != JsonValueKind.Number || !version.TryGetInt32(out var schema) || schema != 1)
+                return (new UiSettings(), true);
+            var settings = root.Deserialize<UiSettings>(JsonOptions)!;
+            var normalized = settings.Normalize();
+            var recovered = settings.ThemeId != normalized.ThemeId || settings.ImportedImage != normalized.ImportedImage
+                || settings.WindowBounds != normalized.WindowBounds || settings.FontScale != normalized.FontScale
+                || settings.SplitterRatio != normalized.SplitterRatio
+                || settings.ColumnWidths?.Count != normalized.ColumnWidths.Count;
+            return (normalized, recovered);
         }
         catch (FileNotFoundException) { return (new UiSettings(), false); }
         catch (DirectoryNotFoundException) { return (new UiSettings(), false); }

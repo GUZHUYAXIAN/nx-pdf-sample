@@ -271,6 +271,25 @@ namespace NxDrawingPdfExporter.App.Tests
         }
 
         [TestMethod]
+        public async Task RevisionEditDoesNotReapproveExternalHistoryChangesOnAnotherItem()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            controller.ExistingPdfPolicy = ExistingPdfPolicy.Revision;
+            var plan = controller.Preflight();
+            File.WriteAllText(Path.Combine(scratch, "in", "drawing2-R7.pdf"), "external history");
+            Assert.IsTrue(controller.Session.SetRevision(plan.Items[0].SourcePath, "R2"));
+
+            await controller.RunAsync();
+
+            Assert.IsEmpty(launcher.LaunchCalls);
+            Assert.IsTrue(controller.Session.IsStale);
+            var refreshed = controller.Preflight();
+            Assert.AreEqual(2, refreshed.Items[0].ChosenRevision);
+            Assert.AreEqual(8, refreshed.Items[1].SuggestedRevision);
+        }
+
+        [TestMethod]
         public async Task ChangedHistoryBeforeRunDoesNotLaunchOrSelectAnotherRevision()
         {
             var controller = NewController();

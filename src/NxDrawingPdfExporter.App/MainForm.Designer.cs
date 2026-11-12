@@ -92,6 +92,7 @@ public sealed partial class MainForm
         manualGrid.Height = 115;
         manualGrid.Dock = DockStyle.Top;
         AddColumns(manualGrid, [("Ordinal", 56), ("Group", 80), ("Source", 480)]);
+        FillFilenameColumns(manualGrid);
         manualGrid.ReadOnly = true;
         outputModeLine.Controls.AddRange([groupMode, unifiedMode]);
         outputRows.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -104,6 +105,7 @@ public sealed partial class MainForm
         restoreRevision = ButtonFor("RestoreRev", RestoreSelectedRevisions);
         reviewTools.Controls.AddRange([inspect, search, problems, visibleCount, batchRevision, restoreRevision]);
         AddColumns(preflight, [("Ordinal", 56), ("Group", 82), ("Source", 270), ("Target", 300), ("Status", 156), ("Rev", 95)]);
+        FillFilenameColumns(preflight);
         preflight.Columns["Rev"]!.ReadOnly = false;
         preflight.EditMode = DataGridViewEditMode.EditOnKeystrokeOrF2;
         AttachGridPane(split.Panel1, reviewTools, preflight);
@@ -113,6 +115,7 @@ public sealed partial class MainForm
         resultHeading.Margin = new Padding(6, 8, 8, 3);
         resultTools.Controls.AddRange([resultHeading, summary, ButtonFor("Detail", () => ShowSelectedDetails(results))]);
         AddColumns(results, [("Ordinal", 56), ("Group", 82), ("Source", 250), ("Target", 280), ("Status", 180)]);
+        FillFilenameColumns(results);
         results.ReadOnly = true;
         AttachGridPane(split.Panel2, resultTools, results);
 
@@ -180,6 +183,23 @@ public sealed partial class MainForm
                 Name = key, Width = width, MinimumWidth = 45, ReadOnly = true,
                 SortMode = DataGridViewColumnSortMode.NotSortable
             });
+    }
+
+    private static void FillFilenameColumns(DataGridView grid)
+    {
+        foreach (DataGridViewColumn column in grid.Columns)
+        {
+            if (column.Name is "Source" or "Target")
+            {
+                column.MinimumWidth = 96;
+                column.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                column.FillWeight = column.Name == "Source" ? 48 : 52;
+            }
+            else
+            {
+                column.Resizable = DataGridViewTriState.False;
+            }
+        }
     }
 
     private static void AttachGridPane(Control host, Control toolbar, DataGridView grid)

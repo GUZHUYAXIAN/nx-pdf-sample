@@ -131,7 +131,8 @@ internal sealed class AppearanceDialog : Form
             }
         }
         apply.Enabled = !theme.IsImageTheme || available;
-        preview(theme.Id, parameter, ImageReference);
+        if (available || !theme.IsImageTheme)
+            preview(theme.Id, parameter, ImageReference);
     }
 
     private void PreviewSliders()

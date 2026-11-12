@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Runtime.Serialization;
@@ -174,6 +175,8 @@ namespace NxDrawingPdfExporter.Contracts
                 throw new ProtocolException("Items 不能为 null。");
             }
 
+            var tempPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var finalPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             for (var i = 0; i < request.Items.Length; i++)
             {
                 var item = request.Items[i];
@@ -185,7 +188,20 @@ namespace NxDrawingPdfExporter.Contracts
                 RequireAbsolute(item.SourcePath, $"Items[{i}].SourcePath");
                 RequireAbsolute(item.FinalOutputPath, $"Items[{i}].FinalOutputPath");
                 RequireAbsolute(item.WorkerTempOutputPath, $"Items[{i}].WorkerTempOutputPath");
+
+                var temporary = Path.GetFullPath(item.WorkerTempOutputPath);
+                var final = Path.GetFullPath(item.FinalOutputPath);
+                if (!string.Equals(Path.GetExtension(final), ".pdf", StringComparison.OrdinalIgnoreCase)
+                    || !temporary.EndsWith(".tmp.pdf", StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(Path.GetDirectoryName(temporary), Path.GetDirectoryName(final), StringComparison.OrdinalIgnoreCase)
+                    || !tempPaths.Add(temporary) || !finalPaths.Add(final))
+                {
+                    throw new ProtocolException("任务 PDF 路径必须唯一，临时 PDF 与正式 PDF 必须同目录。");
+                }
             }
+
+            if (tempPaths.Overlaps(finalPaths))
+                throw new ProtocolException("临时路径与正式目标冲突。");
 
             if (request.OutputMode == OutputMode.UnifiedDirectory)
             {
@@ -243,9 +259,16 @@ namespace NxDrawingPdfExporter.Contracts
         private static void RequireAbsolute(string value, string field)
         {
             RequireText(value, field);
-            if (!Path.IsPathRooted(value))
+            try
             {
-                throw new ProtocolException($"必填字段 {field} 必须是绝对路径。");
+                var root = Path.GetPathRoot(value);
+                if (string.IsNullOrEmpty(root) || root.Length == 1 || (root.Length == 2 && root[1] == ':'))
+                    throw new ProtocolException($"必填字段 {field} 必须是绝对路径。");
+                Path.GetFullPath(value);
+            }
+            catch (Exception error) when (error is ArgumentException || error is IOException || error is NotSupportedException)
+            {
+                throw new ProtocolException($"必填字段 {field} 包含无效路径。", error);
             }
         }
 

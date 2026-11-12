@@ -240,7 +240,13 @@ public sealed partial class MainForm
         }
         foreach (Control row in outputRows.Controls)
             if (row.Tag is SourceDirectoryGroup group)
-                row.BackColor = GroupColor(group.Label).IsEmpty ? palette.Surface : GroupColor(group.Label);
+            {
+                var groupColor = GroupColor(group.Label);
+                row.BackColor = groupColor.IsEmpty ? palette.Surface : groupColor;
+                foreach (Control child in row.Controls)
+                    if (child is Label)
+                        child.BackColor = row.BackColor;
+            }
         Invalidate(true);
     }
 

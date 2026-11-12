@@ -32,9 +32,7 @@ public sealed class PreflightSession(IRevisionOutputPlanner planner)
         Inputs = Array.AsReadOnly(normalized);
         Routing = routing;
         Policy = policy;
-        Groups = SourceDirectoryGrouper.Group(Inputs, labels);
-        foreach (var group in Groups)
-            labels[group.Key] = group.Label;
+        Groups = DescribeGroups(Inputs);
 
         var retained = normalized.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var source in manualChoices.Keys.Concat(invalidEdits.Keys).Distinct(StringComparer.OrdinalIgnoreCase).ToArray())
@@ -46,7 +44,17 @@ public sealed class PreflightSession(IRevisionOutputPlanner planner)
         }
     }
 
+    public IReadOnlyList<SourceDirectoryGroup> DescribeGroups(IReadOnlyList<string> paths)
+    {
+        var groups = SourceDirectoryGrouper.Group(paths, labels);
+        foreach (var group in groups)
+            labels[group.Key] = group.Label;
+        return groups;
+    }
+
     public string? InvalidEdit(string sourcePath) => invalidEdits.GetValueOrDefault(sourcePath);
+
+    public int? ManualRevision(string sourcePath) => manualChoices.TryGetValue(sourcePath, out var choice) ? choice.Value : null;
 
     public bool SetRevision(string sourcePath, string text) => SetRevisions([sourcePath], text);
 
@@ -66,8 +74,8 @@ public sealed class PreflightSession(IRevisionOutputPlanner planner)
             else
                 invalidEdits[source] = text;
         }
-        if (valid && !IsStale)
-            Refresh();
+        if (valid)
+            UpdatePlanAfterEdit();
         return valid;
     }
 
@@ -78,15 +86,41 @@ public sealed class PreflightSession(IRevisionOutputPlanner planner)
             manualChoices.Remove(source);
             invalidEdits.Remove(source);
         }
-        if (!IsStale)
-            Refresh();
+        UpdatePlanAfterEdit();
     }
 
     public OutputPlan Refresh()
     {
-        CurrentPlan = planner.Plan(new OutputPlanningRequest(Inputs, Routing, Policy, manualChoices));
+        CurrentPlan = PlanInputs();
         IsStale = false;
         return CurrentPlan;
+    }
+
+    private OutputPlan PlanInputs() => planner.Plan(new OutputPlanningRequest(Inputs, Routing, Policy, manualChoices));
+
+    private void UpdatePlanAfterEdit()
+    {
+        if (IsStale || CurrentPlan is null)
+            return;
+
+        // An edit approves a revision choice. An explicit refresh approves new file facts.
+        var edited = PlanInputs();
+        for (var index = 0; index < CurrentPlan.Items.Count; index++)
+        {
+            var original = CurrentPlan.Items[index];
+            var updated = edited.Items[index];
+            if ((original.CatalogSnapshot is { } catalog &&
+                    (updated.CatalogSnapshot is null || !catalog.Matches(updated.CatalogSnapshot)))
+                || (original.ExpectedTarget is { } expected
+                    && StringComparer.OrdinalIgnoreCase.Equals(original.FinalOutputPath, updated.FinalOutputPath)
+                    && (updated.ExpectedTarget is null || !expected.Matches(updated.ExpectedTarget))))
+            {
+                Invalidate();
+                return;
+            }
+        }
+
+        CurrentPlan = edited;
     }
 
     public FrozenExportBatch FreezeForRun(NxInstallation selectedNx)

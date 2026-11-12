@@ -22,6 +22,25 @@ public sealed class UiSettingsTests
     }
 
     [TestMethod]
+    public void StoreReportsRecoveryWhenThemeOrLayoutIsInvalid()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(root.FullName, "NxDrawingPdfExporter.slnx")))
+            root = root.Parent ?? throw new DirectoryNotFoundException();
+        var directory = Directory.CreateDirectory(Path.Combine(root.FullName, "artifacts", "settings-tests", Guid.NewGuid().ToString("N")));
+        try
+        {
+            var path = Path.Combine(directory.FullName, "ui-settings.json");
+            File.WriteAllText(path, """{"schemaVersion":1,"themeId":"unknown","splitterRatio":-1}""");
+            var (settings, recovered) = new JsonUiSettingsStore(path).Load();
+            Assert.IsTrue(recovered);
+            Assert.AreEqual("cloud", settings.ThemeId);
+            Assert.AreEqual(.58, settings.SplitterRatio);
+        }
+        finally { directory.Delete(recursive: true); }
+    }
+
+    [TestMethod]
     public void InvalidLayoutAndUnknownSchemaUseDefaults()
     {
         var defaults = new UiSettings();

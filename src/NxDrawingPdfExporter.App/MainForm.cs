@@ -102,8 +102,8 @@ public sealed partial class MainForm : Form
         skip.CheckedChanged += (_, _) => { if (skip.Checked) SetPolicy(ExistingPdfPolicy.Skip); };
         overwrite.CheckedChanged += (_, _) => { if (overwrite.Checked) SetPolicy(ExistingPdfPolicy.Overwrite); };
         revision.CheckedChanged += (_, _) => { if (revision.Checked) SetPolicy(ExistingPdfPolicy.Revision); };
-        search.TextChanged += (_, _) => { if (CommitRevisionEdit()) RenderPlan(); };
-        problems.CheckedChanged += (_, _) => { if (CommitRevisionEdit()) RenderPlan(); };
+        search.TextChanged += (_, _) => { if (CommitRevisionEdit()) { RenderPlan(); RenderResults(); } };
+        problems.CheckedChanged += (_, _) => { if (CommitRevisionEdit()) { RenderPlan(); RenderResults(); } };
         foreach (var grid in new[] { preflight, results, manualGrid })
         {
             grid.Enter += (_, _) => lastGrid = grid;
@@ -237,7 +237,12 @@ public sealed partial class MainForm : Form
             Math.Clamp(saved.Y, area.Top, area.Bottom - height), width, height);
         foreach (DataGridViewColumn column in preflight.Columns)
             if (settings.ColumnWidths.TryGetValue(column.Name, out var columnWidth))
-                column.Width = Math.Max(column.MinimumWidth, columnWidth * DeviceDpi / 96);
+            {
+                if (column.AutoSizeMode == DataGridViewAutoSizeColumnMode.Fill)
+                    column.FillWeight = columnWidth;
+                else
+                    column.Width = Math.Max(column.MinimumWidth, columnWidth * DeviceDpi / 96);
+            }
     }
 
     private void ApplyFont()
@@ -276,7 +281,13 @@ public sealed partial class MainForm : Form
         CenterToScreen();
         int[] widths = [56, 82, 270, 300, 156, 95];
         for (var index = 0; index < widths.Length; index++)
-            preflight.Columns[index].Width = widths[index] * DeviceDpi / 96;
+        {
+            var column = preflight.Columns[index];
+            if (column.AutoSizeMode == DataGridViewAutoSizeColumnMode.Fill)
+                column.FillWeight = widths[index];
+            else
+                column.Width = widths[index] * DeviceDpi / 96;
+        }
         AdjustLayout();
         SaveSettings();
     }

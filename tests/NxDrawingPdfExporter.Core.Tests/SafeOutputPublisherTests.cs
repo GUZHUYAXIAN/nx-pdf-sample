@@ -269,6 +269,33 @@ namespace NxDrawingPdfExporter.Core.Tests
         }
 
         [TestMethod]
+        public void FinalTargetRemainsProtectedThroughBackupCleanup()
+        {
+            File.WriteAllText(finalPath, "old pdf bytes");
+            var valid = TestPdfFactory.CreatePages(1);
+            File.WriteAllBytes(tempPath, valid);
+            var replacer = new CleanupReplacer(finalPath, tryWriteTarget: true);
+            var outcome = CreatePublisher(new ContentInspector(), replacer).Publish(Plan(1));
+
+            Assert.AreEqual(PublicationOutcomeStatus.Replaced, outcome.Status);
+            CollectionAssert.AreEqual(valid, File.ReadAllBytes(finalPath));
+            Assert.IsTrue(replacer.WriteWasBlocked);
+        }
+
+        [TestMethod]
+        public void CleanupFailureRetainsOldBytesAndReportsFailure()
+        {
+            File.WriteAllText(finalPath, "old pdf bytes");
+            File.WriteAllBytes(tempPath, TestPdfFactory.CreatePages(1));
+            var outcome = CreatePublisher(new ContentInspector(),
+                new CleanupReplacer(finalPath, tryWriteTarget: false)).Publish(Plan(1));
+
+            Assert.AreEqual(PublicationOutcomeStatus.PublishFailed, outcome.Status);
+            Assert.IsNotNull(outcome.BackupPath);
+            Assert.AreEqual("old pdf bytes", File.ReadAllText(outcome.BackupPath));
+        }
+
+        [TestMethod]
         public void Publish_OverwriteExisting_DeletesBackupOnlyAfterFinalInspection()
         {
             File.WriteAllText(finalPath, "old pdf bytes");
@@ -400,6 +427,27 @@ namespace NxDrawingPdfExporter.Core.Tests
 
 
             public void DeleteFile(string path) => inner.DeleteFile(path);
+        }
+
+        private sealed class CleanupReplacer(string finalPath, bool tryWriteTarget) : IFileReplacer
+        {
+            private readonly FileReplacer inner = new();
+            public bool WriteWasBlocked { get; private set; }
+
+            public void MoveIntoPlace(string tempPath, string target) => inner.MoveIntoPlace(tempPath, target);
+            public void ReplaceWithBackup(string tempPath, string target, string backup) => inner.ReplaceWithBackup(tempPath, target, backup);
+
+            public void DeleteFile(string path)
+            {
+                if (path.EndsWith(".bak.pdf", StringComparison.Ordinal))
+                {
+                    if (!tryWriteTarget)
+                        throw new IOException("Backup is in use.");
+                    try { File.WriteAllText(finalPath, "unrelated write"); }
+                    catch (IOException) { WriteWasBlocked = true; }
+                }
+                inner.DeleteFile(path);
+            }
         }
 
         private sealed class RecordingInspector : IPdfInspector

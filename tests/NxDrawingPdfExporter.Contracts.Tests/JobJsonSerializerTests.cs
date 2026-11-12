@@ -188,6 +188,29 @@ namespace NxDrawingPdfExporter.Contracts.Tests
         }
 
         [TestMethod]
+        [DataRow(@"E:temp.pdf")]
+        [DataRow(@"\temp.pdf")]
+        public void DriveRelativeTempPathIsRejected(string temp)
+        {
+            var request = BuildFullRequest();
+            request.Items[0].WorkerTempOutputPath = temp;
+            Assert.ThrowsExactly<ProtocolException>(() =>
+                JobJsonSerializer.Deserialize<JobRequest>(JobJsonSerializer.Serialize(request)));
+        }
+
+        [TestMethod]
+        public void WorkerTemporaryPathCannotAliasFinalOrSource()
+        {
+            var request = BuildFullRequest();
+            request.Items[0].WorkerTempOutputPath = request.Items[0].FinalOutputPath;
+            Assert.ThrowsExactly<ProtocolException>(() =>
+                JobJsonSerializer.Deserialize<JobRequest>(JobJsonSerializer.Serialize(request)));
+            request.Items[0].WorkerTempOutputPath = request.Items[0].SourcePath;
+            Assert.ThrowsExactly<ProtocolException>(() =>
+                JobJsonSerializer.Deserialize<JobRequest>(JobJsonSerializer.Serialize(request)));
+        }
+
+        [TestMethod]
         public void Deserialize_RelativeRequiredPath_Throws()
         {
             var request = BuildFullRequest();

@@ -200,7 +200,8 @@ public sealed partial class MainForm
             RenderPlan();
             UpdateDynamicState();
             if (controller.Session.Inputs.Count == 0)
-                Notify("NoInput", "Preflight");
+                Notify(controller.InputTechnicalDetails is null ? "NoInput" : "InputFailed", "Preflight",
+                    controller.InputTechnicalDetails);
         }
         catch (Exception error) { Notify("PreflightError", "Preflight", error.Message); }
     }
@@ -308,7 +309,7 @@ public sealed partial class MainForm
     {
         var paths = controller.ManualPaths;
         var groups = manualList.CanEdit ? controller.Session.Groups :
-            SourceDirectoryGrouper.Group(paths, new Dictionary<string, string>());
+            controller.Session.DescribeGroups(paths);
         var labelsBySource = groups.SelectMany(group => group.SourcePaths.Select(path => (path, group.Label)))
             .ToDictionary(item => item.path, item => item.Label, StringComparer.OrdinalIgnoreCase);
         RenderRows(manualGrid, paths.Select((path, index) =>
@@ -325,9 +326,8 @@ public sealed partial class MainForm
         preflight.Columns["Rev"]!.Visible = revision.Checked;
         var items = controller.Session.CurrentPlan?.Items ?? Array.Empty<PlannedOutputItem>();
         var filtered = items.Where(item =>
-            (!problems.Checked || item.IsBlocking || controller.Session.InvalidEdit(item.SourcePath) is not null)
-            && (Path.GetFileName(item.SourcePath).Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase)
-                || Path.GetFileName(item.FinalOutputPath).Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase)));
+            (!problems.Checked || item.IsBlocking || (revision.Checked && controller.Session.InvalidEdit(item.SourcePath) is not null))
+            && MatchesSearch(item.SourcePath, item.FinalOutputPath));
         RenderRows(preflight, filtered.Select(item =>
         {
             var group = GroupLabel(item.GroupKey);
@@ -339,7 +339,7 @@ public sealed partial class MainForm
             var reason = Ui.Reason(item.ReasonCode, item.ReasonArguments);
             var row = new GridRow(item.SourcePath, item.FinalOutputPath, group, status, reason, item.TechnicalDetails, item);
             return (row, new object?[] { item.SourceOrdinal, group, Path.GetFileName(item.SourcePath),
-                Path.GetFileName(item.FinalOutputPath), status, invalid ?? item.ChosenRevision?.ToString() });
+                Path.GetFileName(item.FinalOutputPath), status, invalid ?? (controller.Session.ManualRevision(item.SourcePath) ?? item.ChosenRevision)?.ToString() });
         }));
         UpdateVisibleCount(preflight.RowCount, items.Count);
     }
@@ -349,8 +349,12 @@ public sealed partial class MainForm
 
     private void RenderResults()
     {
-        RenderRows(results, controller.Results.Select((item, index) =>
+        RenderRows(results, controller.Results.Select((item, index) => (item, index))
+            .Where(entry => (!problems.Checked || entry.item.Status is FileResultStatus.Failed or FileResultStatus.NameConflict)
+                && MatchesSearch(entry.item.SourcePath, entry.item.FinalOutputPath))
+            .Select(entry =>
         {
+            var (item, index) = entry;
             var known = runRows.GetValueOrDefault(item.SourcePath, (index + 1, ""));
             var label = Ui.Get("Result." + item.Status);
             var reason = Ui.Reason(item.ReasonCode, item.ReasonArguments);
@@ -361,6 +365,13 @@ public sealed partial class MainForm
             return (row, new object?[] { known.Item1, known.Item2, Path.GetFileName(item.SourcePath),
                 Path.GetFileName(item.FinalOutputPath), label });
         }));
+    }
+
+    private bool MatchesSearch(string source, string target)
+    {
+        var query = search.Text.Trim();
+        return Path.GetFileName(source).Contains(query, StringComparison.OrdinalIgnoreCase)
+            || Path.GetFileName(target).Contains(query, StringComparison.OrdinalIgnoreCase);
     }
 
     private void RenderRows(DataGridView grid, IEnumerable<(GridRow Data, object?[] Cells)> rows)
