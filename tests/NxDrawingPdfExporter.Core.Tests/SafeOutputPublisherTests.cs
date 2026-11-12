@@ -18,7 +18,7 @@ namespace NxDrawingPdfExporter.Core.Tests
         [TestInitialize]
         public void Initialize()
         {
-            directory = Path.Combine(Path.GetTempPath(), "nxpdf-publisher-" + Guid.NewGuid().ToString("N"));
+            directory = Path.Combine(ProjectScratch(), "nxpdf-publisher-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directory);
             finalPath = Path.Combine(directory, "drawing.pdf");
             tempPath = Path.Combine(directory, ".drawing.run1.abc123.tmp.pdf");
@@ -39,12 +39,7 @@ namespace NxDrawingPdfExporter.Core.Tests
             File.WriteAllText(finalPath, "old pdf bytes");
             var publisher = CreatePublisher(new ThrowingInspector());
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 2
-            });
+            var outcome = publisher.Publish(Plan(2));
 
             Assert.AreEqual(PublicationOutcomeStatus.ValidationFailed, outcome.Status);
             Assert.IsTrue(outcome.OriginalPreserved);
@@ -53,17 +48,48 @@ namespace NxDrawingPdfExporter.Core.Tests
         }
 
         [TestMethod]
+        public void PlannedCreateNeverOverwritesNewTarget()
+        {
+            var request = new PublicationRequest
+            {
+                TempPdfPath = tempPath, FinalOutputPath = finalPath, ExpectedPageCount = 1,
+                Intent = PlannedPublishIntent.CreateNew, ExpectedTarget = TargetSnapshot.Missing
+            };
+            File.WriteAllBytes(tempPath, TestPdfFactory.CreatePages(1));
+            File.WriteAllText(finalPath, "third party");
+            var outcome = CreatePublisher(new ContentInspector()).Publish(request);
+            Assert.AreEqual(PublicationOutcomeStatus.TargetChanged, outcome.Status);
+            Assert.AreEqual("third party", File.ReadAllText(finalPath));
+        }
+
+        [TestMethod]
+        public void PlannedReplacementRejectsSameLengthChangeOrDisappearance()
+        {
+            File.WriteAllText(finalPath, "old");
+            var expected = new PhysicalTargetStateReader().Capture(finalPath);
+            var request = new PublicationRequest
+            {
+                TempPdfPath = tempPath, FinalOutputPath = finalPath, ExpectedPageCount = 1,
+                Intent = PlannedPublishIntent.ReplaceExpected, ExpectedTarget = expected
+            };
+            var publisher = CreatePublisher(new ContentInspector());
+            File.WriteAllBytes(tempPath, TestPdfFactory.CreatePages(1));
+            File.WriteAllText(finalPath, "new");
+            Assert.AreEqual(PublicationOutcomeStatus.TargetChanged, publisher.Publish(request).Status);
+            Assert.AreEqual("new", File.ReadAllText(finalPath));
+            File.Delete(finalPath);
+            File.WriteAllBytes(tempPath, TestPdfFactory.CreatePages(1));
+            Assert.AreEqual(PublicationOutcomeStatus.TargetChanged, publisher.Publish(request).Status);
+            Assert.IsFalse(File.Exists(finalPath));
+        }
+
+        [TestMethod]
         public void Publish_EmptyTempFile_FailsAndCreatesNoTarget()
         {
             File.WriteAllBytes(tempPath, Array.Empty<byte>());
             var publisher = CreatePublisher(new ThrowingInspector());
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 1
-            });
+            var outcome = publisher.Publish(Plan(1));
 
             Assert.AreEqual(PublicationOutcomeStatus.ValidationFailed, outcome.Status);
             Assert.IsFalse(File.Exists(finalPath));
@@ -78,12 +104,7 @@ namespace NxDrawingPdfExporter.Core.Tests
             File.WriteAllText(tempPath, "this is not a pdf document");
             var publisher = CreatePublisher(CreateStubInspector(hasPdfHeader: false, pageCount: 0));
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 1
-            });
+            var outcome = publisher.Publish(Plan(1));
 
             Assert.AreEqual(PublicationOutcomeStatus.ValidationFailed, outcome.Status);
             Assert.IsTrue(outcome.OriginalPreserved);
@@ -99,12 +120,7 @@ namespace NxDrawingPdfExporter.Core.Tests
             File.WriteAllText(tempPath, "%PDF-1.4\n");
             var publisher = CreatePublisher(CreateStubInspector(hasPdfHeader: true, pageCount: 3));
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 2
-            });
+            var outcome = publisher.Publish(Plan(2));
 
             Assert.AreEqual(PublicationOutcomeStatus.ValidationFailed, outcome.Status);
             Assert.AreEqual("old pdf bytes", File.ReadAllText(finalPath));
@@ -118,12 +134,7 @@ namespace NxDrawingPdfExporter.Core.Tests
             File.WriteAllText(tempPath, "valid new pdf content");
             var publisher = CreatePublisher(CreateStubInspector(hasPdfHeader: true, pageCount: 2));
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 2
-            });
+            var outcome = publisher.Publish(Plan(2));
 
             Assert.AreEqual(PublicationOutcomeStatus.Published, outcome.Status);
             Assert.AreEqual("valid new pdf content", File.ReadAllText(finalPath));
@@ -137,12 +148,7 @@ namespace NxDrawingPdfExporter.Core.Tests
             File.WriteAllText(tempPath, "valid replacement pdf content");
             var publisher = CreatePublisher(CreateStubInspector(hasPdfHeader: true, pageCount: 2));
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 2
-            });
+            var outcome = publisher.Publish(Plan(2));
 
             Assert.AreEqual(PublicationOutcomeStatus.Replaced, outcome.Status);
             Assert.AreEqual("valid replacement pdf content", File.ReadAllText(finalPath));
@@ -151,24 +157,20 @@ namespace NxDrawingPdfExporter.Core.Tests
         }
 
         [TestMethod]
-        public void Publish_ReplacementInterruption_RestoresOriginalBytes()
+        public void Publish_ReplacementInterruption_RetainsOriginalBackup()
         {
             File.WriteAllText(finalPath, "old pdf bytes");
             File.WriteAllText(tempPath, "valid replacement pdf content");
             var publisher = CreatePublisher(CreateStubInspector(hasPdfHeader: true, pageCount: 2), new InterruptedReplaceReplacer());
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 2
-            });
+            var outcome = publisher.Publish(Plan(2));
 
             Assert.AreEqual(PublicationOutcomeStatus.PublishFailed, outcome.Status);
-            Assert.IsTrue(outcome.OriginalPreserved);
-            Assert.AreEqual("old pdf bytes", File.ReadAllText(finalPath));
+            Assert.IsFalse(outcome.OriginalPreserved);
+            Assert.IsNotNull(outcome.BackupPath);
+            Assert.AreEqual("old pdf bytes", File.ReadAllText(outcome.BackupPath));
             Assert.IsFalse(File.Exists(tempPath));
-            Assert.IsEmpty(Directory.GetFiles(directory, "*.bak.pdf"));
+            Assert.HasCount(1, Directory.GetFiles(directory, "*.bak.pdf"));
         }
 
         [TestMethod]
@@ -182,12 +184,7 @@ namespace NxDrawingPdfExporter.Core.Tests
             File.WriteAllText(notes, "user notes");
             var publisher = CreatePublisher(CreateStubInspector(hasPdfHeader: true, pageCount: 7));
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 2
-            });
+            var outcome = publisher.Publish(Plan(2));
 
             Assert.AreEqual(PublicationOutcomeStatus.ValidationFailed, outcome.Status);
             Assert.IsFalse(File.Exists(tempPath));
@@ -203,12 +200,7 @@ namespace NxDrawingPdfExporter.Core.Tests
             File.WriteAllText(tempPath, "%PDF-1.4\n");
             var publisher = CreatePublisher(new ThrowingInspector());
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 2
-            });
+            var outcome = publisher.Publish(Plan(2));
 
             Assert.AreEqual(PublicationOutcomeStatus.ValidationFailed, outcome.Status);
             Assert.AreEqual("old pdf bytes", File.ReadAllText(finalPath));
@@ -243,45 +235,37 @@ namespace NxDrawingPdfExporter.Core.Tests
         }
 
         [TestMethod]
-        public void Publish_ReplacementWritesNonPdfBytes_RestoresOriginal()
+        public void Publish_ReplacementWritesNonPdfBytes_RetainsOriginalBackup()
         {
             File.WriteAllText(finalPath, "old pdf bytes");
             File.WriteAllBytes(tempPath, TestPdfFactory.CreatePages(1));
             var publisher = CreatePublisher(new ContentInspector(), new MutatingReplacer("corrupted non-pdf payload"));
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 1
-            });
+            var outcome = publisher.Publish(Plan(1));
 
             Assert.AreEqual(PublicationOutcomeStatus.PublishFailed, outcome.Status);
-            Assert.IsTrue(outcome.OriginalPreserved);
-            Assert.AreEqual("old pdf bytes", File.ReadAllText(finalPath));
-            Assert.IsEmpty(Directory.GetFiles(directory, "*.bak.pdf"));
+            Assert.IsFalse(outcome.OriginalPreserved);
+            Assert.IsNotNull(outcome.BackupPath);
+            Assert.AreEqual("old pdf bytes", File.ReadAllText(outcome.BackupPath));
+            Assert.HasCount(1, Directory.GetFiles(directory, "*.bak.pdf"));
             Assert.IsFalse(File.Exists(tempPath));
         }
 
         [TestMethod]
-        public void Publish_ReplacementWritesWrongPageCount_RestoresOriginal()
+        public void Publish_ReplacementWritesWrongPageCount_RetainsOriginalBackup()
         {
             File.WriteAllText(finalPath, "old pdf bytes");
             File.WriteAllBytes(tempPath, TestPdfFactory.CreatePages(2));
             var publisher = CreatePublisher(new ContentInspector(), new MutatingReplacer(Encoding.ASCII.GetString(TestPdfFactory.CreatePages(1))));
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 2
-            });
+            var outcome = publisher.Publish(Plan(2));
 
             Assert.AreEqual(PublicationOutcomeStatus.PublishFailed, outcome.Status);
-            Assert.IsTrue(outcome.OriginalPreserved);
-            Assert.AreEqual("old pdf bytes", File.ReadAllText(finalPath));
+            Assert.IsFalse(outcome.OriginalPreserved);
+            Assert.IsNotNull(outcome.BackupPath);
+            Assert.AreEqual("old pdf bytes", File.ReadAllText(outcome.BackupPath));
             StringAssert.Contains(outcome.Message, "页数");
-            Assert.IsEmpty(Directory.GetFiles(directory, "*.bak.pdf"));
+            Assert.HasCount(1, Directory.GetFiles(directory, "*.bak.pdf"));
         }
 
         [TestMethod]
@@ -292,18 +276,32 @@ namespace NxDrawingPdfExporter.Core.Tests
             var timeline = new List<string>();
             var publisher = CreatePublisher(new RecordingInspector(timeline), new RecordingReplacer(timeline));
 
-            var outcome = publisher.Publish(new PublicationRequest
-            {
-                TempPdfPath = tempPath,
-                FinalOutputPath = finalPath,
-                ExpectedPageCount = 1
-            });
+            var outcome = publisher.Publish(Plan(1));
 
             Assert.AreEqual(PublicationOutcomeStatus.Replaced, outcome.Status);
             var finalInspection = timeline.LastIndexOf("inspect:" + finalPath);
             var backupDeletion = timeline.FindIndex(entry => entry.StartsWith("delete:", StringComparison.Ordinal) && entry.EndsWith(".bak.pdf", StringComparison.Ordinal));
             Assert.IsGreaterThanOrEqualTo(0, finalInspection);
             Assert.IsGreaterThan(finalInspection, backupDeletion);
+        }
+
+        private PublicationRequest Plan(int pages)
+        {
+            var expected = new PhysicalTargetStateReader().Capture(finalPath);
+            return new PublicationRequest
+            {
+                TempPdfPath = tempPath, FinalOutputPath = finalPath, ExpectedPageCount = pages,
+                ExpectedTarget = expected,
+                Intent = expected.Exists ? PlannedPublishIntent.ReplaceExpected : PlannedPublishIntent.CreateNew
+            };
+        }
+
+        private static string ProjectScratch()
+        {
+            var root = new DirectoryInfo(AppContext.BaseDirectory);
+            while (!File.Exists(Path.Combine(root.FullName, "NxDrawingPdfExporter.slnx")))
+                root = root.Parent ?? throw new DirectoryNotFoundException("Repository root");
+            return Path.Combine(root.FullName, "artifacts", "publication-tests");
         }
 
         private static SafeOutputPublisher CreatePublisher(IPdfInspector inspector, IFileReplacer? replacer = null)
@@ -356,7 +354,6 @@ namespace NxDrawingPdfExporter.Core.Tests
                 throw new IOException("模拟替换中断");
             }
 
-            public void RestoreBackup(string backupPath, string finalPath) => inner.RestoreBackup(backupPath, finalPath);
 
             public void DeleteFile(string path) => inner.DeleteFile(path);
         }
@@ -401,7 +398,6 @@ namespace NxDrawingPdfExporter.Core.Tests
                 File.WriteAllText(finalPath, finalPayload);
             }
 
-            public void RestoreBackup(string backupPath, string finalPath) => inner.RestoreBackup(backupPath, finalPath);
 
             public void DeleteFile(string path) => inner.DeleteFile(path);
         }
@@ -437,12 +433,6 @@ namespace NxDrawingPdfExporter.Core.Tests
             {
                 inner.ReplaceWithBackup(tempPath, finalPath, backupPath);
                 timeline.Add("replace:" + finalPath);
-            }
-
-            public void RestoreBackup(string backupPath, string finalPath)
-            {
-                inner.RestoreBackup(backupPath, finalPath);
-                timeline.Add("restore:" + finalPath);
             }
 
             public void DeleteFile(string path)

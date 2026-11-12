@@ -385,6 +385,9 @@ namespace NxDrawingPdfExporter.App
             CurrentRunDirectory = runDirectory;
             var runLog = new RunLog(runDirectory);
 
+            var reader = new PhysicalTargetStateReader();
+            var frozenTargets = readyItems.ToDictionary(x => x.SourcePath, x => reader.Capture(x.FinalOutputPath),
+                StringComparer.OrdinalIgnoreCase);
             var jobItems = new List<JobItem>();
             foreach (var item in readyItems)
             {
@@ -540,7 +543,7 @@ namespace NxDrawingPdfExporter.App
                     continue;
                 }
 
-                finalResults.Add(PublishOne(request, workerResult, publisher, runLog));
+                finalResults.Add(PublishOne(request, workerResult, publisher, runLog, frozenTargets[planItem.SourcePath]));
             }
 
             Results = finalResults;
@@ -601,7 +604,7 @@ namespace NxDrawingPdfExporter.App
             }
         }
 
-        private FileResult PublishOne(JobRequest request, FileResult fileResult, SafeOutputPublisher publisher, RunLog runLog)
+        private FileResult PublishOne(JobRequest request, FileResult fileResult, SafeOutputPublisher publisher, RunLog runLog, TargetSnapshot expected)
         {
             if (fileResult.Status != FileResultStatus.Success)
             {
@@ -629,7 +632,9 @@ namespace NxDrawingPdfExporter.App
                 {
                     TempPdfPath = item.WorkerTempOutputPath,
                     FinalOutputPath = item.FinalOutputPath,
-                    ExpectedPageCount = expectedPages
+                    ExpectedPageCount = expectedPages,
+                    Intent = expected.Exists ? PlannedPublishIntent.ReplaceExpected : PlannedPublishIntent.CreateNew,
+                    ExpectedTarget = expected
                 });
 
                 return outcome.Status switch

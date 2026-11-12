@@ -13,12 +13,10 @@ namespace NxDrawingPdfExporter.Core.Output
 
         void ReplaceWithBackup(string tempPath, string finalPath, string backupPath);
 
-        void RestoreBackup(string backupPath, string finalPath);
-
         void DeleteFile(string path);
     }
 
-    /// <summary>基于同卷 File.Move / File.Replace / File.Copy 的默认实现。</summary>
+    /// <summary>基于同卷 File.Move / File.Replace 的默认实现。</summary>
     public sealed class FileReplacer : IFileReplacer
     {
         public void MoveIntoPlace(string tempPath, string finalPath)
@@ -29,12 +27,6 @@ namespace NxDrawingPdfExporter.Core.Output
         public void ReplaceWithBackup(string tempPath, string finalPath, string backupPath)
         {
             File.Replace(tempPath, finalPath, backupPath);
-        }
-
-        public void RestoreBackup(string backupPath, string finalPath)
-        {
-            File.Copy(backupPath, finalPath, overwrite: true);
-            File.Delete(backupPath);
         }
 
         public void DeleteFile(string path)
