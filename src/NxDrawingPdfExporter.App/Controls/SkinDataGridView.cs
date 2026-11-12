@@ -99,7 +99,7 @@ internal sealed class SkinDataGridView : WorkspaceGrid
                     RowStatus?.Invoke(e.RowIndex) is SkinTextRole.Success or SkinTextRole.Warning or SkinTextRole.Error)
                 {
                     var role = RowStatus(e.RowIndex);
-                    var mark = role == SkinTextRole.Success ? "●  " : role == SkinTextRole.Warning ? "▲  " : "■  ";
+                    var mark = role == SkinTextRole.Success ? "●" : role == SkinTextRole.Warning ? "▲" : "■";
                     // Keep the group tint across the row. Status text uses a separate verified material.
                     if (!selected)
                     {
@@ -109,7 +109,9 @@ internal sealed class SkinDataGridView : WorkspaceGrid
                         status.Paint(canvas, capsule);
                         color = status.Foreground;
                     }
-                    text = mark + text;
+                    TextRenderer.DrawText(canvas, mark, cellStyle.Font ?? Font,
+                        new Rectangle(cell.Left - 1, textBounds.Top, inset.Left + 5, textBounds.Height), color,
+                        TextFormatFlags.NoPadding | TextFormatFlags.Top | TextFormatFlags.PreserveGraphicsClipping);
                 }
                 TextRenderer.DrawText(canvas, text, cellStyle.Font ?? Font, textBounds, color,
                     TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl | TextFormatFlags.NoPrefix |
@@ -130,8 +132,8 @@ internal sealed class SkinDataGridView : WorkspaceGrid
         if (BackdropSource?.Frame?.Materials is not { } materials)
             return;
         var area = ClientRectangle;
-        if (VerticalScrollBar.Visible) area.Width -= VerticalScrollBar.Width;
-        if (HorizontalScrollBar.Visible) area.Height -= HorizontalScrollBar.Height;
+        if (VerticalScrollBar.Visible) area.Width = Math.Max(0, area.Width - VerticalScrollBar.Width);
+        if (HorizontalScrollBar.Visible) area.Height = Math.Max(0, area.Height - HorizontalScrollBar.Height);
         var last = Rows.GetLastRow(DataGridViewElementStates.Displayed);
         var endY = last < 0 ? ColumnHeadersHeight : GetRowDisplayRectangle(last, true).Bottom;
         var endX = Columns.GetColumnsWidth(DataGridViewElementStates.Visible) - HorizontalScrollingOffset;

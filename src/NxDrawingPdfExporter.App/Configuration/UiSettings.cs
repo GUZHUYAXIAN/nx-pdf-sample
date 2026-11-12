@@ -29,6 +29,7 @@ public sealed record UiSettings
     public string? ImportedImage { get; init; }
     public int FontScale { get; init; } = 100;
     public Rectangle WindowBounds { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
     public double SplitterRatio { get; init; } = .58;
     public Dictionary<string, int> ColumnWidths { get; init; } = new();
 

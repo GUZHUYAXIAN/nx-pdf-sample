@@ -181,4 +181,18 @@
   <data name="ResultsHeight" xml:space="preserve"><value>Resize results. Drag up to grow or use the arrow keys.</value></data>
   <data name="VerticalTableScroll" xml:space="preserve"><value>Vertical table scroll</value></data>
   <data name="HorizontalTableScroll" xml:space="preserve"><value>Horizontal table scroll</value></data>
+  <data name="PanelOpacity" xml:space="preserve"><value>Panel opacity</value></data>
+  <data name="GradientDirection" xml:space="preserve"><value>Gradient direction</value></data>
+  <data name="GradientLeftRight" xml:space="preserve"><value>Left to right</value></data>
+  <data name="GradientRightLeft" xml:space="preserve"><value>Right to left</value></data>
+  <data name="GradientTopBottom" xml:space="preserve"><value>Top to bottom</value></data>
+  <data name="GradientBottomTop" xml:space="preserve"><value>Bottom to top</value></data>
+  <data name="SurfaceMode" xml:space="preserve"><value>Surface style</value></data>
+  <data name="SurfaceDark" xml:space="preserve"><value>Dark blend</value></data>
+  <data name="SurfaceLight" xml:space="preserve"><value>Light blend</value></data>
+  <data name="AutomaticTextColor" xml:space="preserve"><value>Automatic text contrast</value></data>
+  <data name="ManualTextColor" xml:space="preserve"><value>Text color…</value></data>
+  <data name="ChooseSkinImage" xml:space="preserve"><value>Import a PNG or JPEG to continue.</value></data>
+  <data name="PreviewPending" xml:space="preserve"><value>Rendering preview locally…</value></data>
+  <data name="ContrastProtection" xml:space="preserve"><value>Some surfaces use stronger shading to keep text readable. The sliders retain your settings.</value></data>
 </root>

@@ -71,6 +71,27 @@ public sealed class ThemeFrameTests
         Assert.IsTrue(pending.IsDisposed);
     }
 
+    [TestMethod]
+    public async Task ClosingDisposesQueuedUiDeliveryEvenWhenTheDispatcherNeverRuns()
+    {
+        ThemeFrame? rendered = null;
+        Action? delivery = null;
+        var delivered = false;
+        using var coordinator = new ThemeRenderCoordinator((request, _) =>
+        {
+            rendered = new ThemeFrame(request, new Bitmap(1, 1), null);
+            return rendered;
+        }, _ => delivered = true, _ => Assert.Fail(), TimeSpan.Zero, action => delivery = action);
+        await coordinator.Request(MakeRequest(1));
+        Assert.IsNotNull(rendered);
+        Assert.IsNotNull(delivery);
+        Assert.IsFalse(rendered.IsDisposed);
+        coordinator.Dispose();
+        Assert.IsTrue(rendered.IsDisposed);
+        delivery();
+        Assert.IsFalse(delivered);
+    }
+
     private static ThemeRenderRequest MakeRequest(long revision) =>
         new(revision, null, new Size(1, 1), ThemeCatalog.Load(AppContext.BaseDirectory)[0], new ThemeParameters(), false);
 }

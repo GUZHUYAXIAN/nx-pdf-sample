@@ -181,4 +181,18 @@
   <data name="ResultsHeight" xml:space="preserve"><value>调整结果高度。上拖增高，或用上下方向键。</value></data>
   <data name="VerticalTableScroll" xml:space="preserve"><value>表格纵向滚动</value></data>
   <data name="HorizontalTableScroll" xml:space="preserve"><value>表格横向滚动</value></data>
+  <data name="PanelOpacity" xml:space="preserve"><value>面板遮罩强度</value></data>
+  <data name="GradientDirection" xml:space="preserve"><value>渐变方向</value></data>
+  <data name="GradientLeftRight" xml:space="preserve"><value>从左到右</value></data>
+  <data name="GradientRightLeft" xml:space="preserve"><value>从右到左</value></data>
+  <data name="GradientTopBottom" xml:space="preserve"><value>从上到下</value></data>
+  <data name="GradientBottomTop" xml:space="preserve"><value>从下到上</value></data>
+  <data name="SurfaceMode" xml:space="preserve"><value>融合风格</value></data>
+  <data name="SurfaceDark" xml:space="preserve"><value>深色融合</value></data>
+  <data name="SurfaceLight" xml:space="preserve"><value>浅色融合</value></data>
+  <data name="AutomaticTextColor" xml:space="preserve"><value>自动高对比配色</value></data>
+  <data name="ManualTextColor" xml:space="preserve"><value>手动字色…</value></data>
+  <data name="ChooseSkinImage" xml:space="preserve"><value>请先导入一张 PNG 或 JPEG。</value></data>
+  <data name="PreviewPending" xml:space="preserve"><value>正在本地更新预览…</value></data>
+  <data name="ContrastProtection" xml:space="preserve"><value>已增强部分区域的遮罩以保持文字清晰。滑杆仍显示你的设定值。</value></data>
 </root>

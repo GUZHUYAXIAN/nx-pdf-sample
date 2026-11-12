@@ -15,10 +15,10 @@ internal sealed class SkinButton : Button
         }
         var inside = Enabled && ClientRectangle.Contains(PointToClient(Cursor.Position));
         var state = inside && Capture ? SkinRowState.Selected :
-            inside ? SkinRowState.Hovered : Equals(Tag, "Primary") ? SkinRowState.Selected : SkinRowState.Normal;
+            inside ? SkinRowState.Hovered : Enabled && Equals(Tag, "Primary") ? SkinRowState.Selected : SkinRowState.Normal;
         var material = state == SkinRowState.Normal ? materials.Header : materials.Row(Color.Empty, state);
         SkinPainter.Paint(this, Backdrop, e.Graphics, ClientRectangle, material);
-        using var border = new Pen(Color.FromArgb(Equals(Tag, "Primary") ? 170 : 92, material.Foreground));
+        using var border = new Pen(Color.FromArgb(!Enabled ? 46 : Equals(Tag, "Primary") ? 170 : 92, material.Foreground));
         var bounds = Rectangle.Inflate(ClientRectangle, -1, -1);
         e.Graphics.DrawRectangle(border, bounds);
         TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, material.Foreground,

@@ -25,7 +25,8 @@ public sealed partial class MainForm
     {
         themes = ThemeCatalog.Load(AppContext.BaseDirectory);
         backdrop = new(this, () => frame);
-        themeRenderer = new(ThemeFrame.Render, AcceptFrame, OnThemeFailure, TimeSpan.FromMilliseconds(100));
+        themeRenderer = new(ThemeFrame.Render, AcceptFrame, OnThemeFailure, TimeSpan.FromMilliseconds(100),
+            deliver => BeginInvoke(deliver));
         previousHighContrast = SystemInformation.HighContrast;
         var theme = themes.First(definition => definition.Id == "cloud");
         frame = new(new(0, null, new Size(1, 1), theme, theme.Defaults, previousHighContrast), null, null);
@@ -62,21 +63,19 @@ public sealed partial class MainForm
         var before = appearance;
         prePreviewFrame = frame;
         using var dialog = new AppearanceDialog(Ui, settings, themes, importedImages,
-            (id, effects, image) => ApplyAppearance(id, effects, image)) { Font = Font };
+            (id, effects, image) => ApplyAppearance(id, effects, image),
+            error => BeginInvoke(() => Notify("SettingsError", details: error.Message))) { Font = Font };
         appearanceDialog = dialog;
         dialogBackdrop = new(dialog, () => frame);
         ThemeControlStyler.Apply(dialog, CurrentPalette(), dialogBackdrop);
+        if (frame is not null)
+            dialog.FrameReady(frame);
         var result = dialog.ShowDialog(this);
         appearanceDialog = null;
         dialogBackdrop = null;
         if (result == DialogResult.OK)
         {
-            settings = settings with
-            {
-                ThemeId = dialog.ThemeId,
-                ThemeParametersById = new Dictionary<string, ThemeParameters>(dialog.AppliedParameters),
-                ImportedImage = dialog.ImageReference
-            };
+            settings = dialog.AppliedSettings;
             SaveSettings();
             if (!ReferenceEquals(prePreviewFrame, frame))
                 prePreviewFrame?.Dispose();
@@ -104,7 +103,10 @@ public sealed partial class MainForm
         if (!theme.HasAssets || (theme.IsImageTheme && path is null))
         {
             themeRenderer?.Cancel();
-            WarnThemeUnavailable();
+            if (frame is { } current)
+                appearance = (current.Request.Theme, current.Request.Effects, current.Request.ImagePath);
+            if (prePreviewFrame is null)
+                WarnThemeUnavailable();
             return;
         }
         appearance = (theme, (effects ?? theme.Defaults).Normalize(), path);
@@ -124,6 +126,8 @@ public sealed partial class MainForm
         if (sameAppearance && previous!.PixelSize == size)
         {
             themeRenderer.Cancel();
+            if (frame is { } current)
+                appearanceDialog?.FrameReady(current);
             return;
         }
         var request = new ThemeRenderRequest(++themeRevision, path, size, theme, effects, highContrast,
@@ -144,12 +148,18 @@ public sealed partial class MainForm
         if (!ReferenceEquals(previous, prePreviewFrame) && !ReferenceEquals(previous, next))
             previous?.Dispose();
         RefreshThemeColors();
+        appearanceDialog?.FrameReady(next);
     }
 
     private void OnThemeFailure(Exception error)
     {
         System.Diagnostics.Debug.WriteLine(error);
-        WarnThemeUnavailable();
+        if (frame is { } current)
+            appearance = (current.Request.Theme, current.Request.Effects, current.Request.ImagePath);
+        if (appearanceDialog is { IsDisposed: false } dialog)
+            dialog.FrameFailed(error);
+        else
+            WarnThemeUnavailable();
     }
 
     private void WarnThemeUnavailable()
@@ -216,6 +226,7 @@ public sealed partial class MainForm
         var sample = frame.Backdrop?.GetPixel(0, 0) ?? palette.Background;
         BackColor = palette.Background;
         ThemeControlStyler.Apply(shell, palette, backdrop);
+        shell.BackColor = palette.Background;
         menu.Renderer = SystemInformation.HighContrast ? new ToolStripSystemRenderer()
             : new SkinMenuRenderer(palette, backdrop) { RoundedEdges = false };
         ColorMenu(menu.Items, materials?.Header.Foreground ?? palette.Foreground);

@@ -4,48 +4,71 @@ internal sealed class ThemeRenderCoordinator(
     Func<ThemeRenderRequest, CancellationToken, ThemeFrame> render,
     Action<ThemeFrame> receive,
     Action<Exception> fail,
-    TimeSpan debounce) : IDisposable
+    TimeSpan debounce,
+    Action<Action>? dispatch = null) : IDisposable
 {
     private readonly object sync = new();
     private readonly SemaphoreSlim running = new(1);
     private CancellationTokenSource? current;
+    private ThemeFrame? queued;
+    private long generation;
     private bool disposed;
 
     internal async Task Request(ThemeRenderRequest request)
     {
         CancellationTokenSource pending;
+        long ticket;
         lock (sync)
         {
             if (disposed)
                 return;
-            current?.Cancel();
+            CancelPending();
+            ticket = generation;
             current = pending = new();
         }
 
         ThemeFrame? completed = null;
         try
         {
-            await Task.Delay(debounce, pending.Token);
-            await running.WaitAsync(pending.Token);
-            try { completed = await Task.Run(() => render(request, pending.Token), pending.Token); }
+            await Task.Delay(debounce, pending.Token).ConfigureAwait(false);
+            await running.WaitAsync(pending.Token).ConfigureAwait(false);
+            try
+            {
+                completed = await Task.Run(() => render(request, pending.Token), pending.Token).ConfigureAwait(false);
+            }
             finally { running.Release(); }
 
             lock (sync)
             {
-                if (!disposed && ReferenceEquals(current, pending))
-                {
-                    receive(completed);
-                    completed = null;
-                }
+                if (disposed || generation != ticket)
+                    return;
+                queued = completed;
+                completed = null;
             }
+            Dispatch(() => Deliver(ticket));
         }
         catch (OperationCanceledException) when (pending.IsCancellationRequested) { }
         catch (Exception error)
         {
             lock (sync)
             {
-                if (!disposed && ReferenceEquals(current, pending))
-                    fail(error);
+                if (disposed || generation != ticket)
+                    return;
+                queued?.Dispose();
+                queued = null;
+            }
+            try
+            {
+                Dispatch(() =>
+                {
+                    lock (sync)
+                        if (!disposed && generation == ticket)
+                            fail(error);
+                });
+            }
+            catch (InvalidOperationException dispatchError)
+            {
+                System.Diagnostics.Debug.WriteLine(dispatchError);
             }
         }
         finally
@@ -60,13 +83,37 @@ internal sealed class ThemeRenderCoordinator(
         }
     }
 
-    internal void Cancel()
+    private void Dispatch(Action action)
+    {
+        if (dispatch is null)
+            action();
+        else
+            dispatch(action);
+    }
+
+    private void Deliver(long ticket)
     {
         lock (sync)
         {
-            current?.Cancel();
-            current = null;
+            if (disposed || generation != ticket || queued is not { } result)
+                return;
+            queued = null;
+            receive(result);
         }
+    }
+
+    internal void Cancel()
+    {
+        lock (sync) CancelPending();
+    }
+
+    private void CancelPending()
+    {
+        generation++;
+        current?.Cancel();
+        current = null;
+        queued?.Dispose();
+        queued = null;
     }
 
     public void Dispose()
@@ -74,7 +121,7 @@ internal sealed class ThemeRenderCoordinator(
         lock (sync)
         {
             disposed = true;
-            Cancel();
+            CancelPending();
         }
     }
 }
