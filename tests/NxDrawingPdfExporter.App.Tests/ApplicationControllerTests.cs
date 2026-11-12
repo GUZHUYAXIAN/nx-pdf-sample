@@ -120,7 +120,9 @@ namespace NxDrawingPdfExporter.App.Tests
             var controller = NewController(services);
             controller.ScanFolderPath = Path.Combine(scratch, "in");
             await controller.RunAsync();
-            Assert.AreEqual(selected, launcher.LaunchCalls.Single().Installation);
+            var installation = launcher.LaunchCalls.Single().Installation!;
+            Assert.AreEqual(selected, installation with { Sources = selected.Sources });
+            CollectionAssert.AreEqual(selected.Sources.ToArray(), installation.Sources.ToArray());
             Assert.AreEqual(selected.LauncherPath, launcher.LaunchCalls.Single().NxLauncherPath);
             StringAssert.Contains(controller.NxStatusMessage, "NX 2506");
         }
@@ -131,7 +133,7 @@ namespace NxDrawingPdfExporter.App.Tests
 
             Assert.AreEqual(GuiInputMode.ScanFolder, controller.InputMode);
             Assert.IsFalse(controller.IncludeSubfolders);
-            Assert.AreEqual(OutputMode.BesideSource, controller.OutputMode);
+            Assert.AreEqual(OutputMode.GroupedDirectories, controller.OutputMode);
             Assert.AreEqual(ExistingPdfPolicy.Skip, controller.ExistingPdfPolicy);
             Assert.IsFalse(controller.IsBusy);
         }
@@ -245,6 +247,40 @@ namespace NxDrawingPdfExporter.App.Tests
             Assert.HasCount(2, controller.Results);
             Assert.AreEqual(FileResultStatus.Overwritten, controller.Results[0].Status);
             StringAssert.Contains(File.ReadAllText(Path.Combine(scratch, "in", "drawing1.pdf")), "%PDF-");
+        }
+
+        [TestMethod]
+        public async Task RevisionEditIsFrozenAndHistoryChangeDuringWorkerBlocksOnlyThatItem()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            controller.ExistingPdfPolicy = ExistingPdfPolicy.Revision;
+            var plan = controller.Preflight();
+            var source = plan.Items[0].SourcePath;
+            Assert.IsTrue(controller.Session.SetRevision(source, "R2"));
+            controller.Preflight();
+            launcher.MutateResult = _ =>
+                File.WriteAllText(Path.Combine(scratch, "in", "drawing1-R7.pdf"), "external history");
+            await controller.RunAsync();
+            Assert.AreEqual(FileResultStatus.Failed, controller.Results[0].Status);
+            Assert.AreEqual(ResultReasons.TargetChanged, controller.Results[0].ReasonCode);
+            Assert.AreEqual("drawing1-R2.pdf", Path.GetFileName(controller.Results[0].FinalOutputPath));
+            Assert.IsFalse(File.Exists(controller.Results[0].FinalOutputPath));
+            Assert.AreEqual(FileResultStatus.Success, controller.Results[1].Status);
+            Assert.AreEqual(2, controller.Preflight().Items[0].ChosenRevision);
+        }
+
+        [TestMethod]
+        public async Task ChangedHistoryBeforeRunDoesNotLaunchOrSelectAnotherRevision()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            controller.ExistingPdfPolicy = ExistingPdfPolicy.Revision;
+            controller.Preflight();
+            File.WriteAllText(Path.Combine(scratch, "in", "drawing1-R7.pdf"), "external history");
+            await controller.RunAsync();
+            Assert.IsEmpty(launcher.LaunchCalls);
+            Assert.IsTrue(controller.Session.IsStale);
         }
 
         [TestMethod]

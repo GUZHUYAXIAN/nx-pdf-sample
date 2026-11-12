@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NxDrawingPdfExporter.App.Configuration;
+using NxDrawingPdfExporter.App.Session;
 using NxDrawingPdfExporter.App.Logging;
 using NxDrawingPdfExporter.App.Runtime;
 using NxDrawingPdfExporter.App.Runtime.Detection;
@@ -27,7 +28,9 @@ namespace NxDrawingPdfExporter.App
     {
         public IInputDiscoveryService Discovery { get; init; } = new InputDiscoveryService(new PhysicalFileSystem());
 
-        public IOutputPlanner OutputPlanner { get; init; } = new OutputPlanner(new PhysicalTargetProbe());
+        public ITargetStateReader TargetStateReader { get; init; } = new PhysicalTargetStateReader();
+
+        public IOutputDirectoryReader DirectoryReader { get; init; } = new PhysicalOutputDirectoryReader();
 
         public IWorkerProcessLauncher WorkerLauncher { get; init; } = new WorkerProcessLauncher();
 
@@ -65,12 +68,15 @@ namespace NxDrawingPdfExporter.App
         private readonly ILogSink log;
         private readonly ILogSink nxDiagnosticLog;
         private string? cancellationFlagPath;
+        private bool explicitlyReviewed;
 
         public ApplicationController(ApplicationServices services, ILogSink log, ILogSink? nxDiagnosticLog = null)
         {
             this.services = services ?? throw new ArgumentNullException(nameof(services));
             this.log = log ?? throw new ArgumentNullException(nameof(log));
             this.nxDiagnosticLog = nxDiagnosticLog ?? log;
+            Session = new PreflightSession(new RevisionOutputPlanner(
+                new RevisionCatalog(services.DirectoryReader), services.TargetStateReader));
         }
 
         // ---- 用户可选状态（默认值来自批准的设计） ----
@@ -82,7 +88,11 @@ namespace NxDrawingPdfExporter.App
 
         public IReadOnlyList<string> ManualPaths { get; set; } = Array.Empty<string>();
 
-        public OutputMode OutputMode { get; set; } = OutputMode.BesideSource;
+        public OutputMode OutputMode { get; set; } = OutputMode.GroupedDirectories;
+
+        public Dictionary<string, string> GroupTargets { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public PreflightSession Session { get; }
 
         public string UnifiedOutputDirectory { get; set; } = "";
 
@@ -243,19 +253,17 @@ namespace NxDrawingPdfExporter.App
         }
 
         /// <summary>输出预检查列表，供 GUI 预检查网格显示；不执行任何导出。</summary>
-        public IReadOnlyList<OutputPlanItem> Preflight()
+        public OutputPlan Preflight()
         {
-            var sources = CollectSources();
-            if (sources.Count == 0)
-            {
-                return Array.Empty<OutputPlanItem>();
-            }
+            UpdatePreflightInputs();
+            explicitlyReviewed = true;
+            return Session.Refresh();
+        }
 
-            return services.OutputPlanner.Plan(
-                sources,
-                OutputMode,
-                OutputMode == OutputMode.UnifiedDirectory ? UnifiedOutputDirectory : null,
-                ExistingPdfPolicy);
+        public void UpdatePreflightInputs()
+        {
+            Session.Update(CollectSources(),
+                new OutputRoutingSettings(OutputMode, UnifiedOutputDirectory, GroupTargets), ExistingPdfPolicy);
         }
 
         public async Task RunAsync()
@@ -321,47 +329,50 @@ namespace NxDrawingPdfExporter.App
 
             string launcherPathForRun = selectedNx.LauncherPath;
 
-            var sources = CollectSources();
-            if (sources.Count == 0)
+            UpdatePreflightInputs();
+            if (Session.Inputs.Count == 0)
             {
                 ProgressText = "未发现任何候选 PRT 文件。";
                 return;
             }
 
-            var plan = services.OutputPlanner.Plan(
-                sources,
-                OutputMode,
-                OutputMode == OutputMode.UnifiedDirectory ? UnifiedOutputDirectory : null,
-                ExistingPdfPolicy);
-            var conflicts = plan.Where(p => p.Status == OutputPlanStatus.NameConflict).ToArray();
-            if (conflicts.Length > 0)
+            var reviewed = explicitlyReviewed ? Session.CurrentPlan! : Session.Refresh();
+            if (Session.IsStale || Session.HasInvalidEdit)
             {
-                log.Write($"预检查发现 {conflicts.Length} 个输出名称冲突，已阻止执行。");
-                Results = conflicts.Select(p => new FileResult
-                {
-                    SourcePath = p.SourcePath,
-                    FinalOutputPath = p.FinalOutputPath,
-                    Status = FileResultStatus.NameConflict,
-                    Message = "输出名称冲突，该项未执行。"
-                }).ToArray();
+                ProgressText = "请重新预检查并修正版次后再开始。";
+                return;
+            }
+            if (reviewed.HasBlockingIssues)
+            {
+                Results = reviewed.Items.Where(item => item.IsBlocking).Select(item => PlanResult(item,
+                    item.ReasonCode is ResultReasons.NameConflict or ResultReasons.FamilyConflict
+                        ? FileResultStatus.NameConflict : FileResultStatus.Failed, item.ReasonCode)).ToArray();
                 Summary = ResultSummary.From(Results);
-                ProgressText = "存在输出名称冲突，已阻止执行。";
+                ProgressText = "存在预检查问题，已阻止执行。";
                 return;
             }
 
-            var readyItems = plan.Where(p => p.Status == OutputPlanStatus.Ready).ToArray();
+            FrozenExportBatch frozen;
+            try
+            {
+                frozen = Session.FreezeForRun(selectedNx);
+            }
+            catch (PreflightChangedException error)
+            {
+                Results = [PlanResult(error.Item, FileResultStatus.Failed, ResultReasons.TargetChanged, error.Message)];
+                Summary = ResultSummary.From(Results);
+                ProgressText = "文件事实已变化，请重新预检查。";
+                return;
+            }
+
+            var plan = frozen.Items;
+            var readyItems = plan.Where(item => !item.IsSkipped).ToArray();
 
             // 全部目标 PDF 已存在且策略为跳过：不需要 NX，也不启动 Worker，
             // 更不创建运行目录——直接给出完整的跳过结果。
             if (readyItems.Length == 0)
             {
-                Results = plan.Select(p => new FileResult
-                {
-                    SourcePath = p.SourcePath,
-                    FinalOutputPath = p.FinalOutputPath,
-                    Status = FileResultStatus.SkippedExisting,
-                    Message = "已存在，已跳过。"
-                }).ToArray();
+                Results = plan.Select(item => PlanResult(item, FileResultStatus.SkippedExisting, ResultReasons.SkippedExisting)).ToArray();
                 Summary = ResultSummary.From(Results);
                 ProgressText = "全部目标 PDF 已存在，按跳过策略无需导出。";
                 log.Write(ProgressText);
@@ -385,13 +396,10 @@ namespace NxDrawingPdfExporter.App
             CurrentRunDirectory = runDirectory;
             var runLog = new RunLog(runDirectory);
 
-            var reader = new PhysicalTargetStateReader();
-            var frozenTargets = readyItems.ToDictionary(x => x.SourcePath, x => reader.Capture(x.FinalOutputPath),
-                StringComparer.OrdinalIgnoreCase);
             var jobItems = new List<JobItem>();
             foreach (var item in readyItems)
             {
-                var tempName = "." + Path.GetFileName(item.FinalOutputPath) + "." + runId + "." + Guid.NewGuid().ToString("N").Substring(0, 8) + ".tmp.pdf";
+                var tempName = ".nxpdf-" + Guid.NewGuid().ToString("N") + ".tmp.pdf";
                 jobItems.Add(new JobItem
                 {
                     SourcePath = item.SourcePath,
@@ -404,9 +412,9 @@ namespace NxDrawingPdfExporter.App
             {
                 RunId = runId,
                 Items = jobItems.ToArray(),
-                OutputMode = OutputMode,
-                UnifiedOutputDirectory = OutputMode == OutputMode.UnifiedDirectory ? UnifiedOutputDirectory : null,
-                ExistingPdfPolicy = ExistingPdfPolicy,
+                OutputMode = frozen.Routing.Mode,
+                UnifiedOutputDirectory = frozen.Routing.Mode == OutputMode.UnifiedDirectory ? frozen.Routing.UnifiedDirectory : null,
+                ExistingPdfPolicy = frozen.Policy,
                 ResultPath = Path.Combine(runDirectory, "result.json"),
                 CancellationFlagPath = Path.Combine(runDirectory, "cancel.flag")
             };
@@ -424,7 +432,7 @@ namespace NxDrawingPdfExporter.App
             {
                 launch = await Task.Run(() => services.WorkerLauncher.Launch(new WorkerLaunchRequest
                 {
-                    Installation = selectedNx,
+                    Installation = frozen.Installation,
                     KnownNxRoots = NxDiscovery.Installations.Select(i => i.RootDirectory).ToArray(),
                     NxLauncherPath = launcherPathForRun,
                     WorkerExePath = workerExePath,
@@ -470,6 +478,7 @@ namespace NxDrawingPdfExporter.App
                     SourcePath = item.SourcePath,
                     FinalOutputPath = item.FinalOutputPath,
                     Status = FileResultStatus.Failed,
+                    ReasonCode = ResultReasons.WorkerResultInvalid,
                     Message = "Worker 结果文件与本次运行不匹配，不能作为成功依据。"
                 }).ToArray();
                 Summary = ResultSummary.From(Results);
@@ -483,7 +492,7 @@ namespace NxDrawingPdfExporter.App
             // 处理过取消——已完成的条目必须照常发布，不得重复取消；只有
             // Worker 退出后新出现的标志才属于发布阶段的新取消请求。
             var flagPresentAtWorkerExit = IsCancellationRequested();
-            var publisher = new SafeOutputPublisher(services.PdfInspector, services.FileReplacer);
+            var publisher = new SafeOutputPublisher(services.PdfInspector, services.FileReplacer, services.TargetStateReader);
             var workerResults = result.Files
                 .GroupBy(f => f.SourcePath, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
@@ -493,15 +502,9 @@ namespace NxDrawingPdfExporter.App
             for (var index = 0; index < plan.Count; index++)
             {
                 var planItem = plan[index];
-                if (planItem.Status == OutputPlanStatus.SkippedExisting)
+                if (planItem.IsSkipped)
                 {
-                    finalResults.Add(new FileResult
-                    {
-                        SourcePath = planItem.SourcePath,
-                        FinalOutputPath = planItem.FinalOutputPath,
-                        Status = FileResultStatus.SkippedExisting,
-                        Message = "已存在，已跳过。"
-                    });
+                    finalResults.Add(PlanResult(planItem, FileResultStatus.SkippedExisting, ResultReasons.SkippedExisting));
                     continue;
                 }
 
@@ -521,6 +524,7 @@ namespace NxDrawingPdfExporter.App
                         SourcePath = planItem.SourcePath,
                         FinalOutputPath = planItem.FinalOutputPath,
                         Status = FileResultStatus.Cancelled,
+                        ReasonCode = ResultReasons.Cancelled,
                         Message = "已请求取消，该文件未被发布。"
                     });
                     continue;
@@ -536,6 +540,8 @@ namespace NxDrawingPdfExporter.App
                         SourcePath = planItem.SourcePath,
                         FinalOutputPath = planItem.FinalOutputPath,
                         Status = FileResultStatus.Failed,
+                        ReasonCode = ResultReasons.WorkerResultInvalid,
+                        TechnicalDetails = fatal ?? "",
                         Message = fatal is null
                             ? "Worker 未报告该文件的结果。"
                             : "批处理在完成该文件前发生致命错误: " + fatal
@@ -543,9 +549,16 @@ namespace NxDrawingPdfExporter.App
                     continue;
                 }
 
-                finalResults.Add(PublishOne(request, workerResult, publisher, runLog, frozenTargets[planItem.SourcePath]));
+                if (workerResult.Status == FileResultStatus.Success && !Session.IsCurrent(planItem, out var details))
+                {
+                    DeleteRunOwnedTemp(request, planItem.SourcePath, runLog);
+                    finalResults.Add(PlanResult(planItem, FileResultStatus.Failed, ResultReasons.TargetChanged, details));
+                    continue;
+                }
+                finalResults.Add(PublishOne(request, workerResult, publisher, runLog, planItem));
             }
 
+            Session.Invalidate();
             Results = finalResults;
             Summary = ResultSummary.From(finalResults);
             if (fatal is not null)
@@ -604,7 +617,7 @@ namespace NxDrawingPdfExporter.App
             }
         }
 
-        private FileResult PublishOne(JobRequest request, FileResult fileResult, SafeOutputPublisher publisher, RunLog runLog, TargetSnapshot expected)
+        private FileResult PublishOne(JobRequest request, FileResult fileResult, SafeOutputPublisher publisher, RunLog runLog, PlannedOutputItem planned)
         {
             if (fileResult.Status != FileResultStatus.Success)
             {
@@ -633,16 +646,19 @@ namespace NxDrawingPdfExporter.App
                     TempPdfPath = item.WorkerTempOutputPath,
                     FinalOutputPath = item.FinalOutputPath,
                     ExpectedPageCount = expectedPages,
-                    Intent = expected.Exists ? PlannedPublishIntent.ReplaceExpected : PlannedPublishIntent.CreateNew,
-                    ExpectedTarget = expected
+                    Intent = planned.PublishIntent,
+                    ExpectedTarget = planned.ExpectedTarget
                 });
 
-                return outcome.Status switch
+                var published = Done(fileResult, outcome.Status switch
                 {
-                    PublicationOutcomeStatus.Published => Done(fileResult, FileResultStatus.Success, outcome.Message),
-                    PublicationOutcomeStatus.Replaced => Done(fileResult, FileResultStatus.Overwritten, outcome.Message),
-                    _ => Failed(fileResult, outcome.Message)
-                };
+                    PublicationOutcomeStatus.Published => FileResultStatus.Success,
+                    PublicationOutcomeStatus.Replaced => FileResultStatus.Overwritten,
+                    _ => FileResultStatus.Failed
+                }, outcome.Message);
+                published.ReasonCode = outcome.ReasonCode;
+                published.TechnicalDetails = outcome.TechnicalDetails;
+                return published;
             }
             catch (Exception error)
             {
@@ -650,6 +666,16 @@ namespace NxDrawingPdfExporter.App
                 return Failed(fileResult, "发布 PDF 失败: " + SingleLine(error.Message));
             }
         }
+
+        private static FileResult PlanResult(PlannedOutputItem item, FileResultStatus status, string reason, string? details = null) => new()
+        {
+            SourcePath = item.SourcePath,
+            FinalOutputPath = item.FinalOutputPath,
+            Status = status,
+            ReasonCode = reason,
+            ReasonArguments = item.ReasonArguments.ToArray(),
+            TechnicalDetails = details ?? item.TechnicalDetails
+        };
 
         private static FileResult Done(FileResult source, FileResultStatus status, string message)
         {
@@ -667,7 +693,10 @@ namespace NxDrawingPdfExporter.App
 
         private static FileResult Failed(FileResult source, string message)
         {
-            return Done(source, FileResultStatus.Failed, message);
+            var result = Done(source, FileResultStatus.Failed, message);
+            result.ReasonCode = ResultReasons.PublicationFailed;
+            result.TechnicalDetails = message;
+            return result;
         }
 
         private IReadOnlyList<string> CollectSources()

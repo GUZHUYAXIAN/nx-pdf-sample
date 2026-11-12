@@ -127,7 +127,7 @@ namespace NxDrawingPdfExporter.App
                 RefreshManualList();
             };
 
-            radioBesideSource.CheckedChanged += (_, _) => { if (radioBesideSource.Checked) { controller.OutputMode = OutputMode.BesideSource; UpdateDynamicState(); } };
+            radioBesideSource.CheckedChanged += (_, _) => { if (radioBesideSource.Checked) { controller.OutputMode = OutputMode.GroupedDirectories; UpdateDynamicState(); } };
             radioUnified.CheckedChanged += (_, _) => { if (radioUnified.Checked) { controller.OutputMode = OutputMode.UnifiedDirectory; UpdateDynamicState(); } };
             buttonBrowseUnified.Click += (_, _) =>
             {
@@ -229,10 +229,10 @@ namespace NxDrawingPdfExporter.App
             controller.ScanFolderPath = textScanFolder.Text;
             controller.UnifiedOutputDirectory = textUnified.Text;
             listPreflight.Items.Clear();
-            IReadOnlyList<OutputPlanItem> plan;
+            IReadOnlyList<PlannedOutputItem> plan;
             try
             {
-                plan = controller.Preflight();
+                plan = controller.Preflight().Items;
             }
             catch (Exception error)
             {
@@ -246,7 +246,7 @@ namespace NxDrawingPdfExporter.App
                 {
                     item.SourcePath,
                     item.FinalOutputPath,
-                    item.Status.ToString()
+                    item.ReasonCode
                 }));
             }
 
@@ -336,7 +336,7 @@ namespace NxDrawingPdfExporter.App
 
             radioScanFolder.Checked = controller.InputMode == GuiInputMode.ScanFolder;
             radioManual.Checked = controller.InputMode == GuiInputMode.ManualSelection;
-            radioBesideSource.Checked = controller.OutputMode == OutputMode.BesideSource;
+            radioBesideSource.Checked = controller.OutputMode == OutputMode.GroupedDirectories;
             radioUnified.Checked = controller.OutputMode == OutputMode.UnifiedDirectory;
             radioSkipExisting.Checked = controller.ExistingPdfPolicy == ExistingPdfPolicy.Skip;
             radioOverwrite.Checked = controller.ExistingPdfPolicy == ExistingPdfPolicy.Overwrite;
