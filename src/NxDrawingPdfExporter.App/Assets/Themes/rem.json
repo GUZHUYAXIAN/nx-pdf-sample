@@ -1,0 +1,16 @@
+{
+  "id": "rem",
+  "background": "#E4EEF9",
+  "surface": "#F5F9FF",
+  "foreground": "#243C59",
+  "accent": "#355F91",
+  "parameters": {
+    "ImageVisibility": 88,
+    "Blur": 0,
+    "MistOpacity": 9,
+    "GradientStrength": 12,
+    "Zoom": 0,
+    "OffsetX": 100,
+    "OffsetY": 28
+  }
+}

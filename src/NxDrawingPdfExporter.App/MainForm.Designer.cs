@@ -7,6 +7,8 @@ public sealed partial class MainForm
 {
     private readonly MenuStrip menu = new() { Dock = DockStyle.Fill, GripStyle = ToolStripGripStyle.Hidden, Padding = new Padding(10, 3, 10, 3) };
     private readonly TableLayoutPanel shell = new() { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(12, 6, 12, 8), BackColor = Color.Transparent };
+    private readonly TableLayoutPanel settingsBand = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
+    private readonly PictureBox artwork = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.StretchImage, Margin = new Padding(6, 0, 0, 6) };
     private readonly Panel settingsScroll = new() { Dock = DockStyle.Fill, AutoScroll = true, Margin = new Padding(0, 0, 0, 6) };
     private readonly TableLayoutPanel settingsPanel = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Padding = new Padding(10, 5, 10, 5) };
     private readonly FlowLayoutPanel nxLine = Flow();
@@ -128,7 +130,12 @@ public sealed partial class MainForm
         bottom.Controls.Add(progress, 0, 1);
         shell.Controls.Add(menu, 0, 0);
         shell.Controls.Add(overview, 0, 1);
-        shell.Controls.Add(settingsScroll, 0, 2);
+        settingsBand.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        settingsBand.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0));
+        settingsBand.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        settingsBand.Controls.Add(settingsScroll, 0, 0);
+        settingsBand.Controls.Add(artwork, 1, 0);
+        shell.Controls.Add(settingsBand, 0, 2);
         shell.Controls.Add(split, 0, 3);
         shell.Controls.Add(bottom, 0, 4);
         Controls.Add(shell);

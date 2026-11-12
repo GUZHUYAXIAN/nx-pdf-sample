@@ -296,7 +296,7 @@ public sealed partial class MainForm : Form
     private void ToggleSettings()
     {
         settingsExpanded = !settingsExpanded;
-        settingsScroll.Visible = settingsExpanded;
+        settingsBand.Visible = settingsExpanded;
         UpdateDynamicState();
         AdjustLayout();
     }

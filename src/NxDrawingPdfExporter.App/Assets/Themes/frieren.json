@@ -1,0 +1,16 @@
+{
+  "id": "frieren",
+  "background": "#E7EEE2",
+  "surface": "#F6FAF3",
+  "foreground": "#314735",
+  "accent": "#486D53",
+  "parameters": {
+    "ImageVisibility": 88,
+    "Blur": 0,
+    "MistOpacity": 9,
+    "GradientStrength": 12,
+    "Zoom": 0,
+    "OffsetX": 100,
+    "OffsetY": 28
+  }
+}

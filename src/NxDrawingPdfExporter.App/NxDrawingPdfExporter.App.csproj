@@ -19,6 +19,11 @@
 
   <ItemGroup>
     <PackageReference Include="PDFsharp" />
+    <Content Include="Assets\Themes\*"
+             Link="assets\themes\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"
+             ExcludeFromSingleFile="true" />
   </ItemGroup>
 
   <ItemGroup>

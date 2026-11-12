@@ -1,0 +1,16 @@
+{
+  "id": "inori",
+  "background": "#F8E8EC",
+  "surface": "#FFF7F9",
+  "foreground": "#562C42",
+  "accent": "#933D68",
+  "parameters": {
+    "ImageVisibility": 88,
+    "Blur": 0,
+    "MistOpacity": 9,
+    "GradientStrength": 12,
+    "Zoom": 0,
+    "OffsetX": 100,
+    "OffsetY": 28
+  }
+}

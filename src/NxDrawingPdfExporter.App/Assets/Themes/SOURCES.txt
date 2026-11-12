@@ -1,0 +1,10 @@
+Offline character illustration assets
+
+Rem is a character from Re:Zero − Starting Life in Another World.
+Inori Yuzuriha is a character from Guilty Crown.
+Frieren is a character from Frieren: Beyond Journey’s End.
+Roxy Migurdia is a character from Mushoku Tensei.
+
+Each image was generated for this local candidate using the built-in OpenAI imagegen tool on 2026-11-12. These are generated fan illustrations. Character and franchise rights remain with their respective rights holders. The illustrations carry no claim of official endorsement or authorization.
+
+The generation brief requested a 16:9 landscape desktop background in restrained hand-drawn anime style. Each recognizable character occupies the right third, with a quiet low-contrast workspace to the left. The individual backdrops are a misty blue manor garden, a rose evening sky, a sage meadow, and periwinkle twilight hills. The full-resolution exports are 1672 × 941. The included previews are 320 × 180. All PNGs were re-encoded into new bitmaps to omit generator and filesystem metadata.
