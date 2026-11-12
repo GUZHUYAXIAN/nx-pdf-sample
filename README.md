@@ -2,7 +2,11 @@
 
 这是一个 Windows 11 x64 本地便携工具，批量读取制图 PRT，将包含实际制图视图的 Drawing Sheet 按 NX 公开 `DrawingSheets` 集合顺序导出为同名多页 PDF。
 
-## 2.1.0 本地候选
+## 2.1.0 整体滚动与融合皮肤候选
+
+本轮候选将设置、预检查与结果排列在同一个主体滚动区，预检查和结果可独立调高。角色皮肤和导入图共用窗口底图，字色和可读性遮罩在本地计算。验收范围与操作见 [本轮验证记录](docs/verification/scroll-immersive-skins/README.md)。
+
+## 上轮 2.1.0 本地候选
 
 本地迭代新增按源目录分组输出、可编辑数字版次、双语界面和四套离线角色皮肤。此候选采用协议 2，需保留完整 ZIP 中的两代 Worker、英文资源和主题素材。验证范围及待验项目见 [2.1.0 验证记录](docs/verification/ui-revision-skins/README.md)。
 
