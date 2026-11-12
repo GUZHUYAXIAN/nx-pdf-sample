@@ -43,9 +43,13 @@ public static class BackgroundRenderer
             }
             if (values.GradientStrength > 0)
             {
-                using var gradient = new LinearGradientBrush(bounds,
-                    Color.FromArgb(values.GradientStrength * 255 / 100, theme.Background),
-                    Color.FromArgb(0, theme.Background), LinearGradientMode.Horizontal);
+                var start = Color.FromArgb(values.GradientStrength * 255 / 100, theme.Background);
+                var end = Color.FromArgb(0, theme.Background);
+                if (values.GradientDirection is SkinGradientDirection.RightToLeft or SkinGradientDirection.BottomToTop)
+                    (start, end) = (end, start);
+                var mode = values.GradientDirection is SkinGradientDirection.TopToBottom or SkinGradientDirection.BottomToTop
+                    ? LinearGradientMode.Vertical : LinearGradientMode.Horizontal;
+                using var gradient = new LinearGradientBrush(bounds, start, end, mode);
                 canvas.FillRectangle(gradient, bounds);
             }
             return output;
