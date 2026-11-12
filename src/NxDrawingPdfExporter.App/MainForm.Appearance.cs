@@ -23,14 +23,12 @@ public sealed partial class MainForm
     {
         themes = ThemeCatalog.Load(AppContext.BaseDirectory);
         paintDelay.Tick += async (_, _) => await PaintBackgroundAsync();
-        artwork.SizeChanged += (_, _) => SchedulePaint();
-        ClientSizeChanged += (_, _) => { ResizeArtwork(); SchedulePaint(); };
+        ClientSizeChanged += (_, _) => SchedulePaint();
         ApplyAppearance(settings.ThemeId, settings.ThemeParametersById.GetValueOrDefault(settings.ThemeId), settings.ImportedImage);
         FormClosed += (_, _) =>
         {
             paintDelay.Dispose();
             workspaceBackground?.Dispose();
-            artwork.Image?.Dispose();
             hints.Dispose();
         };
     }
@@ -68,7 +66,6 @@ public sealed partial class MainForm
         activeTheme = theme;
         activeEffects = effects ?? theme.Defaults;
         activeImagePath = imagePath;
-        ResizeArtwork();
         RefreshThemeColors();
         SchedulePaint();
     }
@@ -77,7 +74,6 @@ public sealed partial class MainForm
     {
         activeTheme = themes[0];
         activeImagePath = null;
-        ResizeArtwork();
         RefreshThemeColors();
         SchedulePaint();
         if (!themeWarningShown)
@@ -90,18 +86,6 @@ public sealed partial class MainForm
         }
     }
 
-    private void ResizeArtwork()
-    {
-        if (settingsBand.ColumnStyles.Count < 2)
-            return;
-        var show = activeImagePath is not null && activeEffects.ImageVisibility > 0 &&
-            !SystemInformation.HighContrast && ClientSize.Width * 96 / DeviceDpi >= 820;
-        var width = show ? Math.Min(380 * DeviceDpi / 96, ClientSize.Width / 4) : 0;
-        if (settingsBand.ColumnStyles[1].Width != width)
-            settingsBand.ColumnStyles[1].Width = width;
-        artwork.Visible = show;
-    }
-
     private void SchedulePaint()
     {
         paintVersion++;
@@ -109,7 +93,7 @@ public sealed partial class MainForm
             return;
         if (activeImagePath is null || activeEffects.ImageVisibility == 0 || SystemInformation.HighContrast)
         {
-            SwapBackground(null, null);
+            SwapBackground(null);
             return;
         }
         if (IsHandleCreated)
@@ -132,30 +116,18 @@ public sealed partial class MainForm
         var theme = activeTheme;
         var effects = activeEffects;
         var canvas = BoundedSize(ClientSize);
-        var portrait = artwork.Visible ? BoundedSize(artwork.ClientSize) : Size.Empty;
         try
         {
             var images = await Task.Run(() =>
             {
                 using var source = new Bitmap(path);
-                var background = BackgroundRenderer.Render(source, canvas, theme, effects);
-                try
-                {
-                    var side = portrait.IsEmpty ? null : BackgroundRenderer.Render(source, portrait, theme, effects);
-                    return (background, side);
-                }
-                catch
-                {
-                    background.Dispose();
-                    throw;
-                }
+                return BackgroundRenderer.Render(source, canvas, theme, effects);
             });
             if (!IsDisposed && version == paintVersion)
-                SwapBackground(images.background, images.side);
+                SwapBackground(images);
             else
             {
-                images.background.Dispose();
-                images.side?.Dispose();
+                images.Dispose();
             }
         }
         catch (Exception error) when (error is ArgumentException or IOException or UnauthorizedAccessException
@@ -182,14 +154,11 @@ public sealed partial class MainForm
         return new Size(Math.Max(1, (int)(size.Width * scale)), Math.Max(1, (int)(size.Height * scale)));
     }
 
-    private void SwapBackground(Bitmap? background, Bitmap? side)
+    private void SwapBackground(Bitmap? background)
     {
         var old = workspaceBackground;
         workspaceBackground = background;
         old?.Dispose();
-        var oldSide = artwork.Image;
-        artwork.Image = side;
-        oldSide?.Dispose();
         Invalidate(true);
     }
 
@@ -219,7 +188,6 @@ public sealed partial class MainForm
         BackColor = palette.Background;
         ApplyControlPalette(shell, palette);
         shell.BackColor = Color.Transparent;
-        settingsBand.BackColor = Color.Transparent;
         menu.Renderer = new ToolStripProfessionalRenderer(new ThemeMenuColors(palette)) { RoundedEdges = false };
         ColorMenu(menu.Items, palette);
         hints.BackColor = palette.Surface;

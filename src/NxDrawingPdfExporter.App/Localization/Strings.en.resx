@@ -177,4 +177,6 @@
   <data name="NxIssue.UnsupportedVersion" xml:space="preserve"><value>The NX component version combination is unsupported.</value></data>
   <data name="NxIssue.CandidateSourceFailed" xml:space="preserve"><value>An NX detection source could not be read.</value></data>
   <data name="NxIssue.SettingsUnavailable" xml:space="preserve"><value>NX settings could not be read.</value></data>
+  <data name="PreflightHeight" xml:space="preserve"><value>Resize preflight. Drag down to grow or use the arrow keys.</value></data>
+  <data name="ResultsHeight" xml:space="preserve"><value>Resize results. Drag up to grow or use the arrow keys.</value></data>
 </root>

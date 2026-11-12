@@ -1,15 +1,17 @@
 using System.Drawing;
 using System.Windows.Forms;
+using NxDrawingPdfExporter.App.Controls;
 
 namespace NxDrawingPdfExporter.App;
 
 public sealed partial class MainForm
 {
     private readonly MenuStrip menu = new() { Dock = DockStyle.Fill, GripStyle = ToolStripGripStyle.Hidden, Padding = new Padding(10, 3, 10, 3) };
-    private readonly TableLayoutPanel shell = new() { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(12, 6, 12, 8), BackColor = Color.Transparent };
-    private readonly TableLayoutPanel settingsBand = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
-    private readonly PictureBox artwork = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.StretchImage, Margin = new Padding(6, 0, 0, 6) };
-    private readonly Panel settingsScroll = new() { Dock = DockStyle.Fill, AutoScroll = true, Margin = new Padding(0, 0, 0, 6) };
+    private readonly TableLayoutPanel shell = new() { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(12, 6, 12, 8), BackColor = Color.Transparent };
+    private readonly Panel workspaceViewport = new() { Dock = DockStyle.Fill, AutoScroll = true, Margin = new Padding(0) };
+    private readonly TableLayoutPanel workspace = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, Margin = new Padding(0) };
+    private readonly HeightResizeGrip preflightGrip = MakeGrip(false);
+    private readonly HeightResizeGrip resultsGrip = MakeGrip(true);
     private readonly TableLayoutPanel settingsPanel = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Padding = new Padding(10, 5, 10, 5) };
     private readonly FlowLayoutPanel nxLine = Flow();
     private readonly Label nxStatus = Caption();
@@ -21,7 +23,7 @@ public sealed partial class MainForm
     private readonly TextBox scanPath = new() { Dock = DockStyle.Fill, AccessibleName = "PRT" };
     private readonly TableLayoutPanel scanLine = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
     private readonly FlowLayoutPanel manualLine = Flow();
-    private readonly DataGridView manualGrid = MakeGrid();
+    private readonly WorkspaceGrid manualGrid = MakeGrid();
     private readonly FlowLayoutPanel outputModeLine = Flow();
     private readonly RadioButton groupMode = Radio();
     private readonly RadioButton unifiedMode = Radio();
@@ -30,7 +32,6 @@ public sealed partial class MainForm
     private readonly RadioButton skip = Radio();
     private readonly RadioButton overwrite = Radio();
     private readonly RadioButton revision = Radio();
-    private readonly SplitContainer split = new() { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 8, Margin = new Padding(0) };
     private readonly FlowLayoutPanel reviewTools = Flow();
     private readonly FlowLayoutPanel resultTools = Flow();
     private readonly TextBox search = new() { Width = 190 };
@@ -40,8 +41,8 @@ public sealed partial class MainForm
     private readonly Label progressText = Caption();
     private readonly Label summary = Caption();
     private readonly ProgressBar progress = new() { Height = 5, Dock = DockStyle.Fill, Margin = new Padding(4, 2, 4, 0) };
-    private readonly DataGridView preflight = MakeGrid();
-    private readonly DataGridView results = MakeGrid();
+    private readonly WorkspaceGrid preflight = MakeGrid();
+    private readonly WorkspaceGrid results = MakeGrid();
     private readonly ToolTip hints = new() { AutoPopDelay = 15000, InitialDelay = 400 };
     private Button start = null!;
     private Button cancel = null!;
@@ -65,16 +66,14 @@ public sealed partial class MainForm
         DoubleBuffered = true;
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         shell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        shell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        shell.RowStyles.Add(new RowStyle(SizeType.Absolute, 264));
         shell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         shell.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         var overview = Flow();
         toggleSettings = ButtonFor("Settings", ToggleSettings);
         overview.Controls.AddRange([toggleSettings, settingsSummary]);
         settingsSummary.Margin = new Padding(12, 8, 2, 0);
-        settingsScroll.Controls.Add(settingsPanel);
         settingsPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         nxLine.Controls.AddRange([nxCombo, ButtonFor("SelectNx", () => RunNxSelection()),
             ButtonFor("RefreshNx", () => _ = TryNxAsync(controller.RefreshNxStatusAsync)),
@@ -108,7 +107,7 @@ public sealed partial class MainForm
         FillFilenameColumns(preflight);
         preflight.Columns["Rev"]!.ReadOnly = false;
         preflight.EditMode = DataGridViewEditMode.EditOnKeystrokeOrF2;
-        AttachGridPane(split.Panel1, reviewTools, preflight);
+        preflight.Height = 280;
 
         var resultHeading = Caption();
         Localize(resultHeading, "Results");
@@ -117,7 +116,7 @@ public sealed partial class MainForm
         AddColumns(results, [("Ordinal", 56), ("Group", 82), ("Source", 250), ("Target", 280), ("Status", 180)]);
         FillFilenameColumns(results);
         results.ReadOnly = true;
-        AttachGridPane(split.Panel2, resultTools, results);
+        results.Height = 320;
 
         var actions = Flow();
         start = ButtonFor("Start", () => _ = StartAsync());
@@ -132,15 +131,10 @@ public sealed partial class MainForm
         bottom.Controls.Add(actions, 0, 0);
         bottom.Controls.Add(progress, 0, 1);
         shell.Controls.Add(menu, 0, 0);
-        shell.Controls.Add(overview, 0, 1);
-        settingsBand.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        settingsBand.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0));
-        settingsBand.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        settingsBand.Controls.Add(settingsScroll, 0, 0);
-        settingsBand.Controls.Add(artwork, 1, 0);
-        shell.Controls.Add(settingsBand, 0, 2);
-        shell.Controls.Add(split, 0, 3);
-        shell.Controls.Add(bottom, 0, 4);
+        workspace.Controls.AddRange([overview, settingsPanel, reviewTools, preflight, preflightGrip, resultTools, resultsGrip, results]);
+        workspaceViewport.Controls.Add(workspace);
+        shell.Controls.Add(workspaceViewport, 0, 1);
+        shell.Controls.Add(bottom, 0, 2);
         Controls.Add(shell);
         MainMenuStrip = menu;
         BuildMenu();
@@ -164,12 +158,12 @@ public sealed partial class MainForm
         return button;
     }
 
-    private static DataGridView MakeGrid() => new()
+    private static WorkspaceGrid MakeGrid() => new()
     {
-        Dock = DockStyle.Fill, Margin = new Padding(0), BorderStyle = BorderStyle.None, AllowUserToAddRows = false,
+        Dock = DockStyle.Top, Margin = new Padding(0), BorderStyle = BorderStyle.None, AllowUserToAddRows = false,
         AllowUserToDeleteRows = false, AllowUserToResizeRows = false, RowHeadersVisible = false,
         SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = true,
-        AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.DisplayedCellsExceptHeaders,
+        AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCellsExceptHeaders,
         ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
         EnableHeadersVisualStyles = false, CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
         DefaultCellStyle = new DataGridViewCellStyle { WrapMode = DataGridViewTriState.True, Padding = new Padding(6, 4, 6, 4) }
@@ -202,14 +196,9 @@ public sealed partial class MainForm
         }
     }
 
-    private static void AttachGridPane(Control host, Control toolbar, DataGridView grid)
+    private static HeightResizeGrip MakeGrip(bool topHandle) => new(topHandle)
     {
-        var pane = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0), ColumnCount = 1, RowCount = 2 };
-        pane.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        pane.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        pane.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        pane.Controls.Add(toolbar, 0, 0);
-        pane.Controls.Add(grid, 0, 1);
-        host.Controls.Add(pane);
-    }
+        Dock = DockStyle.Top, Height = 15, Margin = new Padding(0), Cursor = Cursors.SizeNS,
+        TabStop = true, CausesValidation = false, AccessibleRole = AccessibleRole.Grip
+    };
 }

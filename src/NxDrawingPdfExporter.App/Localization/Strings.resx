@@ -177,4 +177,6 @@
   <data name="NxIssue.UnsupportedVersion" xml:space="preserve"><value>NX 组件版本组合不受支持。</value></data>
   <data name="NxIssue.CandidateSourceFailed" xml:space="preserve"><value>无法读取一个 NX 检测来源。</value></data>
   <data name="NxIssue.SettingsUnavailable" xml:space="preserve"><value>无法读取 NX 设置。</value></data>
+  <data name="PreflightHeight" xml:space="preserve"><value>调整预检查高度。下拖增高，或用上下方向键。</value></data>
+  <data name="ResultsHeight" xml:space="preserve"><value>调整结果高度。上拖增高，或用上下方向键。</value></data>
 </root>

@@ -39,7 +39,7 @@ public sealed partial class MainForm : Form
         InitializeAppearance();
         Shown += async (_, _) =>
         {
-            AdjustLayout();
+            UpdateWorkspaceLayout();
             if (loaded.Recovered)
                 Notify("SettingsFallback");
             await TryNxAsync(controller.RefreshNxStatusAsync);
@@ -131,13 +131,7 @@ public sealed partial class MainForm : Form
             if (pendingRevisionRender && !IsDisposed)
                 BeginInvoke(() => { pendingRevisionRender = false; RenderPlan(); UpdateDynamicState(); });
         };
-        split.SplitterMoved += (_, _) =>
-        {
-            var space = split.Height - split.SplitterWidth;
-            if (!changingLayout && space > 0)
-                settings = settings with { SplitterRatio = Math.Clamp((double)split.SplitterDistance / space, .15, .85) };
-        };
-        SizeChanged += (_, _) => AdjustLayout();
+        BindWorkspaceLayout();
         Ui.Changed += RefreshLanguage;
     }
 
@@ -213,6 +207,10 @@ public sealed partial class MainForm : Form
                 column.HeaderText = Ui.Get(column.Name);
         search.PlaceholderText = Ui.Get("Search");
         search.AccessibleName = Ui.Get("Search");
+        preflightGrip.AccessibleName = Ui.Get("PreflightHeight");
+        resultsGrip.AccessibleName = Ui.Get("ResultsHeight");
+        hints.SetToolTip(preflightGrip, preflightGrip.AccessibleName);
+        hints.SetToolTip(resultsGrip, resultsGrip.AccessibleName);
         hints.SetToolTip(skip, Ui.Get("PolicyOriginal"));
         hints.SetToolTip(overwrite, Ui.Get("PolicyOriginal"));
         hints.SetToolTip(revision, Ui.Get("RevisionBody"));
@@ -248,33 +246,12 @@ public sealed partial class MainForm : Form
     private void ApplyFont()
     {
         Font = new Font("Microsoft YaHei UI", 9F * settings.FontScale / 100F);
-        AdjustLayout();
-    }
-
-    private void AdjustLayout()
-    {
-        if (changingLayout || IsDisposed)
-            return;
-        changingLayout = true;
-        try
-        {
-            shell.RowStyles[2].Height = settingsExpanded ? Math.Min(DeviceDpi * 3f, ClientSize.Height * .34f) : 0;
-            nxStatus.MaximumSize = new Size(Math.Max(200, settingsScroll.ClientSize.Width - 40), 0);
-            var space = split.Height - split.SplitterWidth;
-            var minimum = Math.Min(DeviceDpi * 3 / 4, space / 3);
-            if (minimum >= 24)
-            {
-                split.Panel1MinSize = minimum;
-                split.Panel2MinSize = minimum;
-                split.SplitterDistance = Math.Clamp((int)(settings.SplitterRatio * space), minimum, space - minimum);
-            }
-        }
-        finally { changingLayout = false; }
+        UpdateWorkspaceLayout();
     }
 
     private void ResetLayout()
     {
-        settings = settings with { WindowBounds = Rectangle.Empty, SplitterRatio = new UiSettings().SplitterRatio, ColumnWidths = new() };
+        settings = settings with { WindowBounds = Rectangle.Empty, WorkspaceHeights = new(), ColumnWidths = new() };
         WindowState = FormWindowState.Normal;
         Size = new Size(Math.Min(1220 * DeviceDpi / 96, Screen.FromControl(this).WorkingArea.Width),
             Math.Min(840 * DeviceDpi / 96, Screen.FromControl(this).WorkingArea.Height));
@@ -288,7 +265,7 @@ public sealed partial class MainForm : Form
             else
                 column.Width = widths[index] * DeviceDpi / 96;
         }
-        AdjustLayout();
+        UpdateWorkspaceLayout();
         SaveSettings();
     }
 
@@ -307,9 +284,9 @@ public sealed partial class MainForm : Form
     private void ToggleSettings()
     {
         settingsExpanded = !settingsExpanded;
-        settingsBand.Visible = settingsExpanded;
+        settingsPanel.Visible = settingsExpanded;
         UpdateDynamicState();
-        AdjustLayout();
+        UpdateWorkspaceLayout();
     }
 
     private void UpdateDynamicState()
