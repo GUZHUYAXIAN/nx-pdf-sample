@@ -40,9 +40,22 @@ namespace NxDrawingPdfExporter.Core.Drawing
         [DataMember(Order = 8)]
         public long ElapsedMilliseconds { get; set; }
 
-        public static ExportReport Failed(string failure, FileResultStatus outcome = FileResultStatus.Failed)
+        [DataMember(Order = 10)]
+        public string ReasonCode { get; set; } = ResultReasons.WorkerFailure;
+
+        [DataMember(Order = 11)]
+        public string TechnicalDetails { get; set; } = "";
+
+        public static ExportReport Failed(string failure, FileResultStatus outcome = FileResultStatus.Failed,
+            string reasonCode = ResultReasons.WorkerFailure, string technicalDetails = "")
         {
-            return new ExportReport { Success = false, Failure = failure, Outcome = outcome };
+            return new ExportReport
+            {
+                Failure = failure,
+                Outcome = outcome,
+                ReasonCode = reasonCode,
+                TechnicalDetails = technicalDetails
+            };
         }
     }
 

@@ -33,8 +33,8 @@ namespace NxDrawingPdfExporter.Worker
                 try { openedPart = session.Parts.OpenDisplay(before.FullPath, out loadStatus); }
                 catch (NXException error)
                 {
-                    throw new InvalidOperationException("NX 无法加载部件（错误代码 " + error.ErrorCode
-                        + "）。请检查文件是否损坏、是否由更高版本保存及关联组件是否齐全；不会自动换版本重试。", error);
+                    return ExportReport.Failed("NX 无法加载部件。", reasonCode: ResultReasons.PartLoadFailed,
+                        technicalDetails: error.ToString());
                 }
                 var workPart = openedPart as Part;
                 if (workPart == null)
@@ -47,8 +47,8 @@ namespace NxDrawingPdfExporter.Worker
                 {
                     // 缺失模型依赖：按批准设计该 PRT 失败，不得当作空白页或模板页。
                     return ExportReport.Failed(
-                        "模型依赖未完全加载，已按失败处理: " + string.Join(" ", loadDiagnostics),
-                        FileResultStatus.Failed);
+                        "模型依赖未完全加载，已按失败处理。",
+                        reasonCode: ResultReasons.MissingModel, technicalDetails: string.Join(Environment.NewLine, loadDiagnostics));
                 }
                 var salt = SheetNameTokenizer.NewSalt();
                 var nativeSheets = new List<DrawingSheet>();
@@ -88,19 +88,27 @@ namespace NxDrawingPdfExporter.Worker
 
                 if (selection.Kind == SheetSelectionKind.PureModel)
                 {
-                    return ExportReport.Failed("纯模型部件，没有图纸页。", FileResultStatus.PureModel);
+                    return ExportReport.Failed("纯模型部件，没有图纸页。", FileResultStatus.PureModel, ResultReasons.PureModel);
                 }
 
                 if (selection.Kind == SheetSelectionKind.NoValidSheets)
                 {
-                    return ExportReport.Failed("没有包含实际制图视图的图纸页。", FileResultStatus.NoValidSheets);
+                    return ExportReport.Failed("没有包含实际制图视图的图纸页。", FileResultStatus.NoValidSheets, ResultReasons.NoValidSheets);
                 }
 
                 var selectedSheets = selection.ExportIndices.Select(i => nativeSheets[i]).ToArray();
 
                 // Update/load failures must fail this PRT, never degrade into
                 // a skipped or blank page. Exceptions propagate to Program.
-                new NxViewUpdater().UpdateForExport(workPart, selectedSheets);
+                try
+                {
+                    new NxViewUpdater().UpdateForExport(workPart, selectedSheets);
+                }
+                catch (Exception error)
+                {
+                    return ExportReport.Failed("制图视图更新失败。", reasonCode: ResultReasons.ViewUpdateFailed,
+                        technicalDetails: error.ToString());
+                }
                 new NxPdfExporter().Export(workPart, selectedSheets, Path.GetFullPath(tempPdfPath));
 
                 if (sourceFileGuard.HasChanged(before))

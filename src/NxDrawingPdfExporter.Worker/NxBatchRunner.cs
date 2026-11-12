@@ -72,6 +72,8 @@ namespace NxDrawingPdfExporter.Worker
                     SourcePath = item.SourcePath,
                     FinalOutputPath = item.FinalOutputPath,
                     Status = report.Outcome,
+                    ReasonCode = report.Success ? ResultReasons.TemporaryPdfReady : report.ReasonCode,
+                    TechnicalDetails = report.TechnicalDetails,
                     Message = report.Success ? "临时 PDF 已生成，等待验证发布。" : report.Failure ?? "导出失败。",
                     ExportedSheets = nameMap is null
                         ? Array.Empty<string>()

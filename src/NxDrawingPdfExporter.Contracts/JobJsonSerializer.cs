@@ -214,6 +214,13 @@ namespace NxDrawingPdfExporter.Contracts
                 {
                     throw new ProtocolException("Files 包含 null 项。");
                 }
+
+                RequireText(file.ReasonCode, "ReasonCode");
+                if (!Enum.IsDefined(typeof(FileResultStatus), file.Status)
+                    || file.ReasonArguments is null || file.TechnicalDetails is null)
+                {
+                    throw new ProtocolException("文件结果状态或原因字段无效。");
+                }
             }
         }
 

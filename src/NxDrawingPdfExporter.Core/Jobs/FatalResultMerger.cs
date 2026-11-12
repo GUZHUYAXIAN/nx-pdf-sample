@@ -34,6 +34,8 @@ namespace NxDrawingPdfExporter.Core.Jobs
                     SourcePath = request.Items[index].SourcePath,
                     FinalOutputPath = request.Items[index].FinalOutputPath,
                     Status = FileResultStatus.Failed,
+                    ReasonCode = ResultReasons.WorkerFailure,
+                    TechnicalDetails = fatalMessage,
                     Message = "批处理在完成该文件前发生致命错误: " + Sanitize(fatalMessage)
                 });
             }

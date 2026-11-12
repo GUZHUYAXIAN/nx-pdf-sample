@@ -121,7 +121,7 @@ namespace NxDrawingPdfExporter.Core.Tests
         }
 
         [TestMethod]
-        public void Run_SkipPolicyWithExistingTarget_DoesNotStartWorkerExport()
+        public void Run_SkipPolicyWithNewTarget_FailsWithoutExport()
         {
             var item1 = NewItem("a");
             var item2 = NewItem("b");
@@ -133,7 +133,8 @@ namespace NxDrawingPdfExporter.Core.Tests
             var result = machine.Run(request);
 
             CollectionAssert.AreEqual(new[] { item2.SourcePath }, processor.Processed);
-            Assert.AreEqual(FileResultStatus.SkippedExisting, result.Files[0].Status);
+            Assert.AreEqual(FileResultStatus.Failed, result.Files[0].Status);
+            Assert.AreEqual(ResultReasons.TargetChanged, result.Files[0].ReasonCode);
             Assert.AreEqual(FileResultStatus.Success, result.Files[1].Status);
         }
 

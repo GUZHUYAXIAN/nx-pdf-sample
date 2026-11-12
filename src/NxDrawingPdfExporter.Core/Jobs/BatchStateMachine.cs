@@ -90,6 +90,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
                         SourcePath = item.SourcePath,
                         FinalOutputPath = item.FinalOutputPath,
                         Status = FileResultStatus.NameConflict,
+                        ReasonCode = ResultReasons.NameConflict,
                         Message = "输出名称冲突，该项未执行。"
                     });
                 }
@@ -99,8 +100,9 @@ namespace NxDrawingPdfExporter.Core.Jobs
                     {
                         SourcePath = item.SourcePath,
                         FinalOutputPath = item.FinalOutputPath,
-                        Status = FileResultStatus.SkippedExisting,
-                        Message = "已存在，已跳过。"
+                        Status = FileResultStatus.Failed,
+                        ReasonCode = ResultReasons.TargetChanged,
+                        Message = "目标已变化，该项未执行。"
                     });
                 }
                 else
@@ -130,6 +132,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
                         SourcePath = item.SourcePath,
                         FinalOutputPath = item.FinalOutputPath,
                         Status = FileResultStatus.Failed,
+                        ReasonCode = ResultReasons.WorkerResultInvalid,
                         Message = "导出处理器未返回结果。"
                     };
                 }
@@ -143,6 +146,8 @@ namespace NxDrawingPdfExporter.Core.Jobs
                     SourcePath = item.SourcePath,
                     FinalOutputPath = item.FinalOutputPath,
                     Status = FileResultStatus.Failed,
+                    ReasonCode = ResultReasons.WorkerFailure,
+                    TechnicalDetails = error.ToString(),
                     Message = SingleLine(error.Message)
                 };
             }
@@ -157,6 +162,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
                     SourcePath = items[index].SourcePath,
                     FinalOutputPath = items[index].FinalOutputPath,
                     Status = FileResultStatus.Cancelled,
+                    ReasonCode = ResultReasons.Cancelled,
                     Message = "已取消，未开始。"
                 });
             }
