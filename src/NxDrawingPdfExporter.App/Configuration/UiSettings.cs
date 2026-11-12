@@ -1,19 +1,28 @@
 using System.Drawing;
+using NxDrawingPdfExporter.App.Layout;
 
 namespace NxDrawingPdfExporter.App.Configuration;
 
+public enum SurfaceMode { Dark, Light }
+public enum SkinGradientDirection { LeftToRight, RightToLeft, TopToBottom, BottomToTop }
+
 public sealed record ThemeParameters(int ImageVisibility = 68, int Blur = 0, int MistOpacity = 20,
-    int GradientStrength = 25, int Zoom = 0, int OffsetX = 50, int OffsetY = 50)
+    int GradientStrength = 25, int Zoom = 0, int OffsetX = 50, int OffsetY = 50,
+    int PanelOpacity = 30, SurfaceMode SurfaceMode = SurfaceMode.Dark, bool AutomaticTextColor = true,
+    int? ManualTextColorArgb = null, SkinGradientDirection GradientDirection = SkinGradientDirection.LeftToRight)
 {
     public ThemeParameters Normalize() => new(Clamp(ImageVisibility), Clamp(Blur), Clamp(MistOpacity),
-        Clamp(GradientStrength), Clamp(Zoom), Clamp(OffsetX), Clamp(OffsetY));
+        Clamp(GradientStrength), Clamp(Zoom), Clamp(OffsetX), Clamp(OffsetY), Clamp(PanelOpacity),
+        Enum.IsDefined(SurfaceMode) ? SurfaceMode : SurfaceMode.Dark, AutomaticTextColor, ManualTextColorArgb,
+        Enum.IsDefined(GradientDirection) ? GradientDirection : SkinGradientDirection.LeftToRight);
 
     private static int Clamp(int value) => Math.Clamp(value, 0, 100);
 }
 
 public sealed record UiSettings
 {
-    public int SchemaVersion { get; init; } = 1;
+    public int SchemaVersion { get; init; } = 2;
+    public WorkspaceHeights WorkspaceHeights { get; init; } = new();
     public string Language { get; init; } = "zh-CN";
     public string ThemeId { get; init; } = "cloud";
     public Dictionary<string, ThemeParameters> ThemeParametersById { get; init; } = new();
@@ -25,11 +34,13 @@ public sealed record UiSettings
 
     public UiSettings Normalize()
     {
-        if (SchemaVersion != 1)
+        if (SchemaVersion is not (1 or 2))
             return new UiSettings();
         var defaults = new UiSettings();
         return this with
         {
+            SchemaVersion = 2,
+            WorkspaceHeights = SchemaVersion == 1 ? new() : (WorkspaceHeights ?? new()).Normalize(),
             Language = Language == "en" ? "en" : "zh-CN",
             ThemeId = ThemeId is "cloud" or "graphite" or "lake" or "pine" or "sand" or "rem" or "inori" or "frieren" or "roxy" or "imported" ? ThemeId : "cloud",
             ThemeParametersById = (ThemeParametersById ?? new()).Where(x => x.Value is not null)
