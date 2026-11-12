@@ -110,7 +110,7 @@ internal sealed class SkinDataGridView : WorkspaceGrid
                         color = status.Foreground;
                     }
                     TextRenderer.DrawText(canvas, mark, cellStyle.Font ?? Font,
-                        new Rectangle(cell.Left - 1, textBounds.Top, inset.Left + 5, textBounds.Height), color,
+                        new Rectangle(cell.Left - 1, textBounds.Top, inset.Left + 5, textBounds.Height), material.Foreground,
                         TextFormatFlags.NoPadding | TextFormatFlags.Top | TextFormatFlags.PreserveGraphicsClipping);
                 }
                 TextRenderer.DrawText(canvas, text, cellStyle.Font ?? Font, textBounds, color,

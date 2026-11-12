@@ -28,6 +28,24 @@ public sealed class SkinPaintingTests
     }
 
     [TestMethod]
+    public void ALastWrappedRowTallerThanItsViewportGetsEnoughSpaceToRead()
+    {
+        RunSta(() =>
+        {
+            using var grid = new SkinDataGridView { AllowUserToAddRows = false, Width = 260, Height = 166 };
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Width = 130 });
+            grid.Rows.Add("测试长行");
+            grid.Rows[0].Height = 460;
+            _ = grid.Handle;
+            grid.PerformLayout();
+            grid.Height = grid.MinimumHeightForWrappedRows(grid.Font.Height + 16);
+            grid.PerformLayout();
+            Assert.IsLessThanOrEqualTo(grid.ClientSize.Height, grid.GetRowDisplayRectangle(0, false).Bottom);
+            Assert.IsFalse(grid.VerticalExtent.CanScroll(1));
+        });
+    }
+
+    [TestMethod]
     public void EffectiveMaterialMeetsContrastOnRenderedPixels()
     {
         using var picture = new Bitmap(3, 1);

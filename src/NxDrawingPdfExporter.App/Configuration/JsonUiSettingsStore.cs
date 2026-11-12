@@ -43,7 +43,13 @@ public sealed class JsonUiSettingsStore(string settingsPath)
         {
             if (!container.TryGetProperty(name, out var value))
                 return fallback;
-            try { return value.Deserialize<T>(JsonOptions) ?? fallback; }
+            try
+            {
+                var parsed = value.Deserialize<T>(JsonOptions);
+                if (parsed is null && fallback is not null)
+                    recovered = true;
+                return parsed ?? fallback;
+            }
             catch (JsonException) { recovered = true; return fallback; }
         }
 

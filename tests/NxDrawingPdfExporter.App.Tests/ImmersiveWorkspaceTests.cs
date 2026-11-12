@@ -67,6 +67,17 @@ public sealed class ImmersiveWorkspaceTests
     }
 
     [TestMethod]
+    public void ExplicitNullForRequiredAppearanceFieldReportsRecoveryWithoutLosingOtherFields()
+    {
+        var (settings, recovered) = JsonUiSettingsStore.Read("""
+            {"schemaVersion":2,"language":"en","themeId":null,"importedImage":null}
+            """u8.ToArray());
+        Assert.AreEqual("en", settings.Language);
+        Assert.AreEqual("cloud", settings.ThemeId);
+        Assert.IsTrue(recovered);
+    }
+
+    [TestMethod]
     public void SchemaTwoPreservesIndependentHeightsAndManualEffectValues()
     {
         var (settings, recovered) = JsonUiSettingsStore.Read("""

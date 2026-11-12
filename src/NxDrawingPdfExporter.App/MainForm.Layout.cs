@@ -4,6 +4,8 @@ namespace NxDrawingPdfExporter.App;
 
 public sealed partial class MainForm
 {
+    private bool workspaceLayoutQueued;
+
     private void BindWorkspaceLayout()
     {
         preflightGrip.CurrentHeightDip = () => settings.WorkspaceHeights.PreflightDip;
@@ -18,6 +20,14 @@ public sealed partial class MainForm
             settings = settings with { WorkspaceHeights = settings.WorkspaceHeights with { ResultsDip = height } };
             UpdateWorkspaceLayout();
         };
+        foreach (var grid in new[] { preflight, results, manualGrid })
+        {
+            grid.RowHeightChanged += (_, _) => QueueWorkspaceLayout();
+            grid.RowsAdded += (_, _) => QueueWorkspaceLayout();
+            grid.RowsRemoved += (_, _) => QueueWorkspaceLayout();
+            grid.ColumnWidthChanged += (_, _) => QueueWorkspaceLayout();
+            grid.ColumnHeadersHeightChanged += (_, _) => QueueWorkspaceLayout();
+        }
         workspaceViewport.SizeChanged += (_, _) => UpdateWorkspaceLayout();
         DpiChanged += (_, _) => BeginInvoke(UpdateWorkspaceLayout);
         Shown += (_, _) =>
@@ -25,6 +35,18 @@ public sealed partial class MainForm
             var coordinator = new WorkspaceScrollCoordinator(this, workspaceViewport, [manualGrid, preflight, results]);
             Disposed += (_, _) => coordinator.Dispose();
         };
+    }
+
+    private void QueueWorkspaceLayout()
+    {
+        if (workspaceLayoutQueued || !IsHandleCreated || IsDisposed)
+            return;
+        workspaceLayoutQueued = true;
+        BeginInvoke(() =>
+        {
+            workspaceLayoutQueued = false;
+            UpdateWorkspaceLayout();
+        });
     }
 
     private void UpdateWorkspaceLayout()
@@ -46,5 +68,5 @@ public sealed partial class MainForm
     }
 
     private int Dip(int value) => (int)Math.Round(value * DeviceDpi / 96d);
-    private int MinimumGridHeight(DataGridView grid) => grid.ColumnHeadersHeight + Font.Height + Dip(22);
+    private int MinimumGridHeight(Controls.WorkspaceGrid grid) => grid.MinimumHeightForWrappedRows(Font.Height + Dip(22));
 }
