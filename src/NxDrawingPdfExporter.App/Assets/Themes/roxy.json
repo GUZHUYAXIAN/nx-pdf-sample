@@ -1,0 +1,16 @@
+{
+  "id": "roxy",
+  "background": "#EAE9F8",
+  "surface": "#F7F6FF",
+  "foreground": "#34345A",
+  "accent": "#555098",
+  "parameters": {
+    "ImageVisibility": 88,
+    "Blur": 0,
+    "MistOpacity": 9,
+    "GradientStrength": 12,
+    "Zoom": 0,
+    "OffsetX": 100,
+    "OffsetY": 28
+  }
+}

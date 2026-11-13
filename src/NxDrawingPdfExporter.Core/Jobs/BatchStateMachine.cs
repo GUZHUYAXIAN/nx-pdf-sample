@@ -50,7 +50,8 @@ namespace NxDrawingPdfExporter.Core.Jobs
         }
 
         /// <summary>snapshot 在每个文件状态落定后被调用，用于原子重写 result.json。</summary>
-        public JobResult Run(JobRequest request, IReadOnlyList<BatchItemPreflight>? preflight = null, Action<JobResult>? snapshot = null)
+        public JobResult Run(JobRequest request, IReadOnlyList<BatchItemPreflight>? preflight = null, Action<JobResult>? snapshot = null,
+            Action<BatchItemProgress>? observer = null)
         {
             if (request is null)
             {
@@ -83,6 +84,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
                     break;
                 }
 
+                observer?.Invoke(new BatchItemProgress(index, null));
                 if (preflight is not null && index < preflight.Count && preflight[index].NameConflict)
                 {
                     files.Add(new FileResult
@@ -90,6 +92,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
                         SourcePath = item.SourcePath,
                         FinalOutputPath = item.FinalOutputPath,
                         Status = FileResultStatus.NameConflict,
+                        ReasonCode = ResultReasons.NameConflict,
                         Message = "输出名称冲突，该项未执行。"
                     });
                 }
@@ -99,8 +102,9 @@ namespace NxDrawingPdfExporter.Core.Jobs
                     {
                         SourcePath = item.SourcePath,
                         FinalOutputPath = item.FinalOutputPath,
-                        Status = FileResultStatus.SkippedExisting,
-                        Message = "已存在，已跳过。"
+                        Status = FileResultStatus.Failed,
+                        ReasonCode = ResultReasons.TargetChanged,
+                        Message = "目标已变化，该项未执行。"
                     });
                 }
                 else
@@ -110,6 +114,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
 
                 result.Files = files.ToArray();
                 snapshot?.Invoke(result);
+                observer?.Invoke(new BatchItemProgress(index, files[files.Count - 1]));
             }
 
             result.Files = files.ToArray();
@@ -130,6 +135,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
                         SourcePath = item.SourcePath,
                         FinalOutputPath = item.FinalOutputPath,
                         Status = FileResultStatus.Failed,
+                        ReasonCode = ResultReasons.WorkerResultInvalid,
                         Message = "导出处理器未返回结果。"
                     };
                 }
@@ -143,6 +149,8 @@ namespace NxDrawingPdfExporter.Core.Jobs
                     SourcePath = item.SourcePath,
                     FinalOutputPath = item.FinalOutputPath,
                     Status = FileResultStatus.Failed,
+                    ReasonCode = ResultReasons.WorkerFailure,
+                    TechnicalDetails = error.ToString(),
                     Message = SingleLine(error.Message)
                 };
             }
@@ -157,6 +165,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
                     SourcePath = items[index].SourcePath,
                     FinalOutputPath = items[index].FinalOutputPath,
                     Status = FileResultStatus.Cancelled,
+                    ReasonCode = ResultReasons.Cancelled,
                     Message = "已取消，未开始。"
                 });
             }

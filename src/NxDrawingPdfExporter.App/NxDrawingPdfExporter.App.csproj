@@ -19,6 +19,11 @@
 
   <ItemGroup>
     <PackageReference Include="PDFsharp" />
+    <Content Include="Assets\Themes\*"
+             Link="assets\themes\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest"
+             ExcludeFromSingleFile="true" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,5 +34,14 @@
   <ItemGroup>
     <InternalsVisibleTo Include="NxDrawingPdfExporter.App.Tests" />
   </ItemGroup>
+
+  <Target Name="KeepEnglishSatelliteBesideExecutable" BeforeTargets="_ComputeFilesToBundle">
+    <ItemGroup>
+      <ResolvedFileToPublish Update="@(ResolvedFileToPublish)"
+          Condition="'%(ResolvedFileToPublish.RelativePath)' == 'en\NxDrawingPdfExporter.App.resources.dll'">
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 
 </Project>

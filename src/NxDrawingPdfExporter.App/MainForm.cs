@@ -1,405 +1,402 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+using System.Diagnostics;
+using NxDrawingPdfExporter.App.Configuration;
+using NxDrawingPdfExporter.App.Localization;
 using NxDrawingPdfExporter.App.Logging;
 using NxDrawingPdfExporter.App.Runtime;
-using NxDrawingPdfExporter.App.Runtime.Detection;
 using NxDrawingPdfExporter.Contracts;
-using NxDrawingPdfExporter.Core.Output;
 
-namespace NxDrawingPdfExporter.App
+namespace NxDrawingPdfExporter.App;
+
+internal sealed record MainFormNxViewState(string StatusText, bool ShowCandidateList, bool EnableNxActions, bool EnableStart);
+
+public sealed partial class MainForm : Form
 {
-    internal sealed record MainFormNxViewState(
-        string StatusText,
-        bool ShowCandidateList,
-        bool EnableNxActions,
-        bool EnableStart);
+    private readonly ApplicationController controller;
+    private readonly JsonUiSettingsStore store = new(Path.Combine(JsonUiSettingsStore.LocalRoot, "ui-settings.json"));
+    private readonly ManualListState manualList = new();
+    private readonly List<(Control Control, string Key)> labels = new();
+    private readonly List<(ToolStripItem Item, string Key)> menuLabels = new();
+    private UiSettings settings;
+    private bool settingsExpanded = true;
+    private bool closePending;
+    private bool changingLayout;
+    private DataGridView? lastGrid;
+    private UiText Ui => controller.Text;
 
-    /// <summary>
-    /// 单窗口 UI：控制器状态的薄绑定层，不含业务规则。
-    /// 运行中关闭窗口走安全停止流程，绝不粗暴终止正在替换 PDF 的 Worker。
-    /// </summary>
-    public sealed partial class MainForm : Form
+    public MainForm()
     {
-        private readonly ApplicationController controller;
-        private bool closePending;
-
-        public MainForm()
+        controller = new ApplicationController(new ApplicationServices(), new StartupLogSink(), new NxDetectionLog());
+        var loaded = store.Load();
+        settings = loaded.Settings;
+        Ui.Language = settings.Language;
+        InitializeComponent();
+        WireEvents();
+        ApplySavedLayout();
+        RefreshLanguage();
+        ApplyManualState();
+        RebuildOutputRows();
+        UpdateDynamicState();
+        InitializeAppearance();
+        Shown += async (_, _) =>
         {
-            InitializeComponent();
-            controller = new ApplicationController(new ApplicationServices(), new StartupLogSink(), new NxDetectionLog());
-            BindController();
-            BindEvents();
-            UpdateDynamicState();
-        }
+            UpdateWorkspaceLayout();
+            if (loaded.Recovered)
+                Notify("SettingsFallback");
+            await TryNxAsync(controller.RefreshNxStatusAsync);
+        };
+    }
 
-        private void BindController()
+    internal static MainFormNxViewState BuildNxViewState(ApplicationController controller) => new(
+        controller.NxStatusMessage, controller.NxDiscovery.Installations.Count > 1,
+        !controller.IsBusy && !controller.IsNxDetectionBusy,
+        !controller.IsBusy && !controller.IsNxDetectionBusy && controller.SelectedNx is not null);
+
+    internal static NxInstallation? ChooseNxCandidate(NxInstallationDiscoveryResult discovery, string? highlightedRoot) =>
+        discovery.Installations.FirstOrDefault(nx => string.Equals(nx.RootDirectory, highlightedRoot, StringComparison.OrdinalIgnoreCase))
+        ?? discovery.SelectedInstallation ?? discovery.Installations.FirstOrDefault();
+
+    internal static string FormatNxCandidate(NxInstallation nx) =>
+        $"{nx.Profile.Label} | {nx.RootDirectory} — NXOpen {nx.DetectedVersion} / UF {nx.UfVersion}";
+
+    private void WireEvents()
+    {
+        controller.ProgressChanged += () =>
         {
-            controller.StateChanged += () =>
-            {
-                if (InvokeRequired)
-                {
-                    BeginInvoke(UpdateDynamicState);
-                }
-                else
-                {
-                    UpdateDynamicState();
-                }
-            };
-        }
-
-        internal static MainFormNxViewState BuildNxViewState(ApplicationController controller)
-        {
-            ArgumentNullException.ThrowIfNull(controller);
-            return new MainFormNxViewState(
-                controller.NxStatusMessage,
-                controller.NxDiscovery.Installations.Count > 1,
-                !controller.IsBusy && !controller.IsNxDetectionBusy,
-                !controller.IsBusy && !controller.IsNxDetectionBusy && controller.SelectedNx is not null);
-        }
-
-        internal static NxInstallation? ChooseNxCandidate(NxInstallationDiscoveryResult discovery, string? highlightedRoot) =>
-            discovery.Installations.FirstOrDefault(installation => string.Equals(
-                installation.RootDirectory, highlightedRoot, StringComparison.OrdinalIgnoreCase))
-            ?? discovery.SelectedInstallation
-            ?? discovery.Installations.FirstOrDefault();
-
-        internal static string FormatNxCandidate(NxInstallation installation) =>
-            $"{installation.Profile.Label} | {installation.RootDirectory} — NXOpen {installation.DetectedVersion} / UF {installation.UfVersion}";
-
-        private void BindEvents()
-        {
-            comboNxInstallations.FormattingEnabled = true;
-            comboNxInstallations.Format += (_, args) =>
-            {
-                if (args.ListItem is NxInstallation installation)
-                    args.Value = FormatNxCandidate(installation);
-            };
-            Shown += async (_, _) => await RefreshNxAsync();
-            buttonRefreshNx.Click += async (_, _) => await RefreshNxAsync();
-            buttonSelectNx.Click += async (_, _) =>
-            {
-                if (comboNxInstallations.SelectedItem is NxInstallation selected)
-                {
-                    await PerformNxActionAsync(() => controller.SelectDetectedNxAsync(selected.RootDirectory));
-                }
-            };
-            buttonBrowseNx.Click += async (_, _) => await BrowseNxAsync();
-            radioScanFolder.CheckedChanged += (_, _) => { if (radioScanFolder.Checked) { controller.InputMode = GuiInputMode.ScanFolder; UpdateDynamicState(); } };
-            radioManual.CheckedChanged += (_, _) => { if (radioManual.Checked) { controller.InputMode = GuiInputMode.ManualSelection; UpdateDynamicState(); } };
-            buttonBrowseScan.Click += (_, _) =>
-            {
-                using var dialog = new FolderBrowserDialog();
-                if (Directory.Exists(textScanFolder.Text))
-                {
-                    dialog.SelectedPath = textScanFolder.Text;
-                }
-
-                if (dialog.ShowDialog(this) == DialogResult.OK)
-                {
-                    textScanFolder.Text = dialog.SelectedPath;
-                }
-            };
-            checkRecursive.CheckedChanged += (_, _) => controller.IncludeSubfolders = checkRecursive.Checked;
-            buttonAddFiles.Click += (_, _) =>
-            {
-                using var dialog = new OpenFileDialog { Multiselect = true, Filter = "NX 部件 (*.prt)|*.prt" };
-                if (dialog.ShowDialog(this) == DialogResult.OK)
-                {
-                    var merged = new List<string>(controller.ManualPaths);
-                    merged.AddRange(dialog.FileNames);
-                    controller.ManualPaths = merged;
-                    RefreshManualList();
-                }
-            };
-            buttonRemoveFile.Click += (_, _) =>
-            {
-                var selected = listManual.SelectedItems.Cast<string>().ToList();
-                if (selected.Count == 0)
-                {
-                    return;
-                }
-
-                controller.ManualPaths = controller.ManualPaths.Where(p => !selected.Contains(p, StringComparer.OrdinalIgnoreCase)).ToList();
-                RefreshManualList();
-            };
-
-            radioBesideSource.CheckedChanged += (_, _) => { if (radioBesideSource.Checked) { controller.OutputMode = OutputMode.BesideSource; UpdateDynamicState(); } };
-            radioUnified.CheckedChanged += (_, _) => { if (radioUnified.Checked) { controller.OutputMode = OutputMode.UnifiedDirectory; UpdateDynamicState(); } };
-            buttonBrowseUnified.Click += (_, _) =>
-            {
-                using var dialog = new FolderBrowserDialog();
-                if (Directory.Exists(textUnified.Text))
-                {
-                    dialog.SelectedPath = textUnified.Text;
-                }
-
-                if (dialog.ShowDialog(this) == DialogResult.OK)
-                {
-                    textUnified.Text = dialog.SelectedPath;
-                }
-            };
-
-            radioSkipExisting.CheckedChanged += (_, _) => { if (radioSkipExisting.Checked) { controller.ExistingPdfPolicy = ExistingPdfPolicy.Skip; } };
-            radioOverwrite.CheckedChanged += (_, _) => { if (radioOverwrite.Checked) { controller.ExistingPdfPolicy = ExistingPdfPolicy.Overwrite; } };
-
-            buttonPreflight.Click += (_, _) => RunPreflight();
-            buttonStart.Click += (_, _) => StartRun();
-            buttonCancelRun.Click += (_, _) => controller.Cancel();
-            buttonOpenOutput.Click += (_, _) => OpenOutputDirectory();
-            buttonOpenLog.Click += (_, _) => OpenLog();
-        }
-
-        private async Task RefreshNxAsync()
-            => await PerformNxActionAsync(() => controller.RefreshNxStatusAsync());
-
-        private async Task PerformNxActionAsync(Func<Task> action)
-        {
-            try
-            {
-                await action();
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception error)
-            {
-                MessageBox.Show(this, "NX 操作未完成，请重新检测（" + error.GetType().Name + "）。", "NX 检测失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
-
-        private async Task BrowseNxAsync()
-        {
-            using var dialog = new FolderBrowserDialog
-            {
-                Description = "请选择 NX 根目录：NX 10 包含 UGII，NX 2506 包含 NXBIN"
-            };
-            if (dialog.ShowDialog(this) != DialogResult.OK)
-            {
+            if (IsDisposed || !IsHandleCreated)
                 return;
-            }
-
-            await PerformNxActionAsync(() => controller.SelectManualNxAsync(dialog.SelectedPath));
-        }
-
-        private void StartRun()
-        {
-            controller.ScanFolderPath = textScanFolder.Text;
-            controller.UnifiedOutputDirectory = textUnified.Text;
-            if (controller.InputMode == GuiInputMode.ScanFolder && !Directory.Exists(controller.ScanFolderPath))
-            {
-                MessageBox.Show(this, "请先选择存在的扫描文件夹。", "输入不完整", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            _ = StartRunAsync();
-        }
-
-        private async Task StartRunAsync()
-        {
-            try
-            {
-                await controller.RunAsync();
-                ShowRunOutcome();
-            }
-            catch (Exception error)
-            {
-                MessageBox.Show(this, error.Message, "运行失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                if (closePending)
-                {
-                    Close();
-                }
-            }
-        }
-
-        private void ShowRunOutcome()
-        {
-            if (controller.Summary is { } summary && summary.Failed > 0)
-            {
-                MessageBox.Show(this, controller.SummaryText, "部分文件失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
-
-        private void RunPreflight()
-        {
-            controller.ScanFolderPath = textScanFolder.Text;
-            controller.UnifiedOutputDirectory = textUnified.Text;
-            listPreflight.Items.Clear();
-            IReadOnlyList<OutputPlanItem> plan;
-            try
-            {
-                plan = controller.Preflight();
-            }
-            catch (Exception error)
-            {
-                MessageBox.Show(this, error.Message, "预检查失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            foreach (var item in plan)
-            {
-                listPreflight.Items.Add(new ListViewItem(new[]
-                {
-                    item.SourcePath,
-                    item.FinalOutputPath,
-                    item.Status.ToString()
-                }));
-            }
-
-            if (plan.Count == 0)
-            {
-                MessageBox.Show(this, "未发现任何候选 PRT 文件。", "预检查", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
-
-        private void OpenOutputDirectory()
-        {
-            var directory = controller.OutputMode == OutputMode.UnifiedDirectory && Directory.Exists(textUnified.Text)
-                ? textUnified.Text
-                : Path.GetDirectoryName(listResults.SelectedItems.Count > 0
-                    ? controller.Results.Select(r => r.FinalOutputPath).FirstOrDefault() ?? textScanFolder.Text
-                    : textScanFolder.Text);
-            if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = directory,
-                    UseShellExecute = true
-                });
-            }
-        }
-
-        private void OpenLog()
-        {
-            var runDirectory = controller.CurrentRunDirectory;
-            if (runDirectory is null || !Directory.Exists(runDirectory))
-            {
-                MessageBox.Show(this, "还没有可用的运行日志。", "日志", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = runDirectory,
-                UseShellExecute = true
-            });
-        }
-
-        private void RefreshManualList()
-        {
-            listManual.BeginUpdate();
-            listManual.Items.Clear();
-            foreach (var path in controller.ManualPaths)
-            {
-                listManual.Items.Add(path);
-            }
-
-            listManual.EndUpdate();
-        }
-
-        private void UpdateDynamicState()
-        {
-            MainFormNxViewState nxState = BuildNxViewState(controller);
-            labelNxStatus.Text = nxState.StatusText;
-            comboNxInstallations.Visible = nxState.ShowCandidateList;
-            buttonSelectNx.Visible = nxState.ShowCandidateList;
-            buttonRefreshNx.Enabled = nxState.EnableNxActions;
-            buttonBrowseNx.Enabled = nxState.EnableNxActions;
-            buttonSelectNx.Enabled = nxState.EnableNxActions;
-            comboNxInstallations.Enabled = nxState.EnableNxActions;
-            groupInput.Enabled = nxState.EnableNxActions;
-            groupOutput.Enabled = nxState.EnableNxActions;
-            groupPolicy.Enabled = nxState.EnableNxActions;
-            if (nxState.ShowCandidateList)
-            {
-                NxInstallation? highlighted = ChooseNxCandidate(controller.NxDiscovery,
-                    (comboNxInstallations.SelectedItem as NxInstallation)?.RootDirectory);
-                comboNxInstallations.Items.Clear();
-                foreach (NxInstallation installation in controller.NxDiscovery.Installations)
-                {
-                    comboNxInstallations.Items.Add(installation);
-                }
-                comboNxInstallations.SelectedItem = highlighted;
-            }
+            if (InvokeRequired)
+                BeginInvoke(UpdateRunProgress);
             else
-            {
-                comboNxInstallations.Items.Clear();
-            }
+                UpdateRunProgress();
+        };
+        var elapsedTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+        elapsedTimer.Tick += (_, _) => { if (controller.IsBusy) UpdateRunProgress(); };
+        Shown += (_, _) => elapsedTimer.Start();
+        Disposed += (_, _) => elapsedTimer.Dispose();
 
-            panelScan.Enabled = controller.InputMode == GuiInputMode.ScanFolder;
-            panelManual.Enabled = controller.InputMode == GuiInputMode.ManualSelection;
-            panelUnified.Enabled = controller.OutputMode == OutputMode.UnifiedDirectory;
-
-            radioScanFolder.Checked = controller.InputMode == GuiInputMode.ScanFolder;
-            radioManual.Checked = controller.InputMode == GuiInputMode.ManualSelection;
-            radioBesideSource.Checked = controller.OutputMode == OutputMode.BesideSource;
-            radioUnified.Checked = controller.OutputMode == OutputMode.UnifiedDirectory;
-            radioSkipExisting.Checked = controller.ExistingPdfPolicy == ExistingPdfPolicy.Skip;
-            radioOverwrite.Checked = controller.ExistingPdfPolicy == ExistingPdfPolicy.Overwrite;
-
-            labelProgress.Text = controller.ProgressText;
-            labelSummary.Text = controller.SummaryText;
-            buttonStart.Enabled = nxState.EnableStart;
-            buttonCancelRun.Enabled = controller.IsBusy;
-            buttonPreflight.Enabled = !controller.IsBusy;
-            progressBar.Style = controller.IsBusy ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
-            if (!controller.IsBusy)
-            {
-                progressBar.Value = 0;
-            }
-
-            listResults.Items.Clear();
-            foreach (var result in controller.Results)
-            {
-                listResults.Items.Add(new ListViewItem(new[]
-                {
-                    result.SourcePath,
-                    StatusText(result.Status),
-                    result.Message
-                }));
-            }
-        }
-
-        private static string StatusText(FileResultStatus status)
+        controller.StateChanged += () =>
         {
-            return status switch
+            if (IsDisposed)
+                return;
+            if (InvokeRequired)
+                BeginInvoke(UpdateDynamicState);
+            else
+                UpdateDynamicState();
+        };
+        nxCombo.FormattingEnabled = true;
+        nxCombo.Format += (_, args) => { if (args.ListItem is NxInstallation nx) args.Value = FormatNxCandidate(nx); };
+        scanMode.Checked = true;
+        groupMode.Checked = true;
+        skip.Checked = true;
+        Localize(scanMode, "Scan");
+        Localize(manualMode, "Manual");
+        Localize(recursive, "Recursive");
+        Localize(groupMode, "Grouped");
+        Localize(unifiedMode, "Unified");
+        Localize(skip, "Skip");
+        Localize(overwrite, "Overwrite");
+        Localize(revision, "Revision");
+        Localize(problems, "Problems");
+
+        scanMode.CheckedChanged += (_, _) => { if (scanMode.Checked) SetInputMode(GuiInputMode.ScanFolder); };
+        manualMode.CheckedChanged += (_, _) => { if (manualMode.Checked) SetInputMode(GuiInputMode.ManualSelection); };
+        recursive.CheckedChanged += (_, _) =>
+        {
+            controller.IncludeSubfolders = recursive.Checked;
+            UpdateInputs();
+        };
+        scanPath.TextChanged += (_, _) =>
+        {
+            controller.ScanFolderPath = scanPath.Text.Trim();
+            InvalidatePlan();
+        };
+        scanPath.Validated += (_, _) => UpdateInputs();
+        groupMode.CheckedChanged += (_, _) => { if (groupMode.Checked) SetOutputMode(OutputMode.GroupedDirectories); };
+        unifiedMode.CheckedChanged += (_, _) => { if (unifiedMode.Checked) SetOutputMode(OutputMode.UnifiedDirectory); };
+        skip.CheckedChanged += (_, _) => { if (skip.Checked) SetPolicy(ExistingPdfPolicy.Skip); };
+        overwrite.CheckedChanged += (_, _) => { if (overwrite.Checked) SetPolicy(ExistingPdfPolicy.Overwrite); };
+        revision.CheckedChanged += (_, _) => { if (revision.Checked) SetPolicy(ExistingPdfPolicy.Revision); };
+        search.TextChanged += (_, _) => { if (CommitRevisionEdit()) { RenderPlan(); RenderResults(); } };
+        problems.CheckedChanged += (_, _) => { if (CommitRevisionEdit()) { RenderPlan(); RenderResults(); } };
+        foreach (var grid in new[] { preflight, results, manualGrid })
+        {
+            grid.Enter += (_, _) => lastGrid = grid;
+            grid.KeyDown += (_, args) =>
             {
-                FileResultStatus.Success => "成功",
-                FileResultStatus.Overwritten => "已覆盖",
-                FileResultStatus.SkippedExisting => "已存在，跳过",
-                FileResultStatus.PureModel => "纯模型，跳过",
-                FileResultStatus.NoValidSheets => "无有效图纸页",
-                FileResultStatus.NameConflict => "名称冲突",
-                FileResultStatus.Cancelled => "已取消",
-                FileResultStatus.Failed => "失败",
-                _ => status.ToString()
+                if (args.KeyCode == Keys.F4)
+                {
+                    ShowSelectedDetails(grid);
+                    args.Handled = true;
+                }
+            };
+            grid.CellDoubleClick += (_, args) =>
+            {
+                if (args.RowIndex < 0 || args.ColumnIndex < 0)
+                    return;
+                if (grid == preflight && grid.Columns[args.ColumnIndex].Name == "Rev" && !controller.IsBusy)
+                    grid.BeginEdit(true);
+                else
+                    ShowDetails((GridRow)grid.Rows[args.RowIndex].Tag!);
             };
         }
-
-        protected override void OnFormClosing(FormClosingEventArgs e)
+        preflight.CellValidating += ValidateRevisionEdit;
+        preflight.CellEndEdit += (_, _) =>
         {
-            base.OnFormClosing(e);
-            if (e.CloseReason == CloseReason.UserClosing && controller.IsBusy && !closePending)
-            {
-                // 安全停止：请求取消并等待当前原子操作完成，不杀 Worker。
-                closePending = true;
-                controller.Cancel();
-                labelProgress.Text = "正在等待当前文件安全完成，随后关闭…";
-                e.Cancel = true;
-            }
-        }
+            if (pendingRevisionRender && !IsDisposed)
+                BeginInvoke(() => { pendingRevisionRender = false; RenderPlan(); UpdateDynamicState(); });
+        };
+        BindWorkspaceLayout();
+        Ui.Changed += RefreshLanguage;
+    }
 
-        /// <summary>启动阶段（尚无运行目录）的日志去向：内存缓冲即可。</summary>
-        private sealed class StartupLogSink : ILogSink
+    private void BuildMenu()
+    {
+        var file = MenuRoot("File");
+        AddItem(file, "ScanFolder", BrowseScan);
+        AddItem(file, "Add", AddManual);
+        AddItem(file, "Folder", OpenSelectedFolder);
+        AddItem(file, "Exit", Close);
+        var view = MenuRoot("View");
+        AddItem(view, "Settings", ToggleSettings);
+        AddItem(view, "Problems", () => problems.Checked = !problems.Checked);
+        AddItem(view, "Search", () => search.Focus());
+        AddItem(view, "ResetLayout", ResetLayout);
+        var options = MenuRoot("Options");
+        var language = AddItem(options, "Language", null);
+        AddLiteral(language, "简体中文", () => SetLanguage("zh-CN"));
+        AddLiteral(language, "English", () => SetLanguage("en"));
+        AddItem(options, "Appearance", () => OpenAppearance());
+        var font = AddItem(options, "Font", null);
+        foreach (int size in new[] { 90, 100, 115, 130 })
+            AddLiteral(font, size + "%", () => { settings = settings with { FontScale = size }; ApplyFont(); SaveSettings(); });
+        var help = MenuRoot("Help");
+        AddItem(help, "Guide", () => Notify("GuideBody", "Guide"));
+        AddItem(help, "RevisionRules", () => Notify("RevisionBody", "RevisionRules"));
+        AddItem(help, "Log", OpenLog);
+        AddItem(help, "About", () => ShowNotice(this, Ui.Get("About"), Ui.Get("Title") + " " +
+            typeof(MainForm).Assembly.GetName().Version?.ToString(3)));
+    }
+
+    private ToolStripMenuItem MenuRoot(string key)
+    {
+        var item = new ToolStripMenuItem();
+        menuLabels.Add((item, key));
+        menu.Items.Add(item);
+        return item;
+    }
+
+    private ToolStripMenuItem AddItem(ToolStripMenuItem parent, string key, Action? action)
+    {
+        var item = new ToolStripMenuItem();
+        menuLabels.Add((item, key));
+        if (action is not null)
+            item.Click += (_, _) => action();
+        parent.DropDownItems.Add(item);
+        return item;
+    }
+
+    private static void AddLiteral(ToolStripMenuItem parent, string label, Action action) =>
+        parent.DropDownItems.Add(label, null, (_, _) => action());
+
+    private void Localize(Control control, string key) => labels.Add((control, key));
+
+    private void SetLanguage(string language)
+    {
+        settings = settings with { Language = language };
+        Ui.Language = language;
+        SaveSettings();
+    }
+
+    private void RefreshLanguage()
+    {
+        Text = Ui.Get("Title");
+        foreach (var (control, key) in labels)
+            control.Text = Ui.Get(key);
+        foreach (var (item, key) in menuLabels)
+            item.Text = Ui.Get(key);
+        foreach (var grid in new[] { preflight, results, manualGrid })
         {
-            public void Write(string message)
-            {
-                System.Diagnostics.Debug.WriteLine(message);
-            }
+            grid.NameScrollBars(Ui.Get("VerticalTableScroll"), Ui.Get("HorizontalTableScroll"));
+            foreach (DataGridViewColumn column in grid.Columns)
+                column.HeaderText = Ui.Get(column.Name);
         }
+        search.PlaceholderText = Ui.Get("Search");
+        search.AccessibleName = Ui.Get("Search");
+        preflightGrip.AccessibleName = Ui.Get("PreflightHeight");
+        resultsGrip.AccessibleName = Ui.Get("ResultsHeight");
+        hints.SetToolTip(preflightGrip, preflightGrip.AccessibleName);
+        hints.SetToolTip(resultsGrip, resultsGrip.AccessibleName);
+        hints.SetToolTip(skip, Ui.Get("PolicyOriginal"));
+        hints.SetToolTip(overwrite, Ui.Get("PolicyOriginal"));
+        hints.SetToolTip(revision, Ui.Get("RevisionBody"));
+        ApplyManualState();
+        RebuildOutputRows();
+        RenderPlan();
+        RenderResults();
+        UpdateDynamicState();
+    }
+
+    private void ApplySavedLayout()
+    {
+        ApplyFont();
+        var saved = settings.WindowBounds;
+        if (saved.IsEmpty)
+            return;
+        var area = Screen.FromRectangle(saved).WorkingArea;
+        var width = Math.Min(Math.Max(MinimumSize.Width, saved.Width), area.Width);
+        var height = Math.Min(Math.Max(MinimumSize.Height, saved.Height), area.Height);
+        StartPosition = FormStartPosition.Manual;
+        Bounds = new Rectangle(Math.Clamp(saved.X, area.Left, area.Right - width),
+            Math.Clamp(saved.Y, area.Top, area.Bottom - height), width, height);
+        foreach (DataGridViewColumn column in preflight.Columns)
+            if (settings.ColumnWidths.TryGetValue(column.Name, out var columnWidth))
+            {
+                if (column.AutoSizeMode == DataGridViewAutoSizeColumnMode.Fill)
+                    column.FillWeight = columnWidth;
+                else
+                    column.Width = Math.Max(column.MinimumWidth, columnWidth * DeviceDpi / 96);
+            }
+    }
+
+    private void ApplyFont()
+    {
+        Font = new Font("Microsoft YaHei UI", 9F * settings.FontScale / 100F);
+        UpdateWorkspaceLayout();
+    }
+
+    private void ResetLayout()
+    {
+        settings = settings with { WindowBounds = Rectangle.Empty, WorkspaceHeights = new(), ColumnWidths = new() };
+        WindowState = FormWindowState.Normal;
+        Size = new Size(Math.Min(1220 * DeviceDpi / 96, Screen.FromControl(this).WorkingArea.Width),
+            Math.Min(840 * DeviceDpi / 96, Screen.FromControl(this).WorkingArea.Height));
+        CenterToScreen();
+        int[] widths = [56, 82, 270, 300, 156, 95];
+        for (var index = 0; index < widths.Length; index++)
+        {
+            var column = preflight.Columns[index];
+            if (column.AutoSizeMode == DataGridViewAutoSizeColumnMode.Fill)
+                column.FillWeight = widths[index];
+            else
+                column.Width = widths[index] * DeviceDpi / 96;
+        }
+        UpdateWorkspaceLayout();
+        SaveSettings();
+    }
+
+    private void SaveSettings()
+    {
+        settings = settings with
+        {
+            WindowBounds = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds,
+            ColumnWidths = preflight.Columns.Cast<DataGridViewColumn>()
+                .ToDictionary(column => column.Name, column => column.Width * 96 / DeviceDpi)
+        };
+        try { store.Save(settings); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { Notify("SettingsError", details: error.Message); }
+    }
+
+    private void ToggleSettings()
+    {
+        settingsExpanded = !settingsExpanded;
+        settingsPanel.Visible = settingsExpanded;
+        UpdateDynamicState();
+        UpdateWorkspaceLayout();
+    }
+
+    private void UpdateDynamicState()
+    {
+        var state = BuildNxViewState(controller);
+        nxStatus.Text = state.StatusText;
+        var candidates = controller.NxDiscovery.Installations;
+        if (!nxCombo.Items.Cast<NxInstallation>().SequenceEqual(candidates))
+        {
+            var highlighted = ChooseNxCandidate(controller.NxDiscovery, (nxCombo.SelectedItem as NxInstallation)?.RootDirectory);
+            nxCombo.Items.Clear();
+            nxCombo.Items.AddRange(candidates.Cast<object>().ToArray());
+            nxCombo.SelectedItem = highlighted;
+        }
+        nxCombo.Visible = state.ShowCandidateList;
+        nxLine.Controls[1].Visible = state.ShowCandidateList;
+        settingsPanel.Enabled = state.EnableNxActions;
+        inspect.Enabled = !controller.IsBusy;
+        start.Enabled = state.EnableStart && controller.Session.CurrentPlan is { HasBlockingIssues: false, Items.Count: > 0 }
+            && !controller.Session.IsStale && !controller.Session.HasInvalidEdit;
+        preflight.Columns["Rev"]!.ReadOnly = controller.IsBusy;
+        batchRevision.Enabled = restoreRevision.Enabled = !controller.IsBusy && revision.Checked && !controller.Session.IsStale;
+        UpdateRunProgress();
+        summary.Text = controller.SummaryText;
+        toggleSettings.Text = (settingsExpanded ? "▾ " : "▸ ") + Ui.Get("Settings");
+        settingsSummary.Text = Ui.Get("SettingsSummary", controller.SelectedNx?.Profile.Label ?? Ui.Get("NxUnselected"),
+            controller.Session.Inputs.Count, Ui.Get(unifiedMode.Checked ? "Unified" : "Grouped"));
+        if (!controller.IsBusy)
+            RenderResults();
+    }
+
+    private async Task TryNxAsync(Func<CancellationToken, Task> action)
+    {
+        if (controller.IsBusy || controller.IsNxDetectionBusy)
+            return;
+        try { await action(default); }
+        catch (Exception error) { Notify("NxError", details: error.Message); }
+    }
+
+    private void RunNxSelection()
+    {
+        if (nxCombo.SelectedItem is NxInstallation selected)
+            _ = TryNxAsync(token => controller.SelectDetectedNxAsync(selected.RootDirectory, token));
+    }
+
+    private async Task BrowseNxAsync()
+    {
+        using var picker = new FolderBrowserDialog { Description = Ui.Get("NxBrowseHint"), UseDescriptionForTitle = true };
+        if (picker.ShowDialog(this) == DialogResult.OK)
+            await TryNxAsync(token => controller.SelectManualNxAsync(picker.SelectedPath, token));
+    }
+
+    private void Notify(string key, string? title = null, string? details = null) =>
+        ShowNotice(this, Ui.Get(title ?? "Title"),
+            Ui.Get(key) + (string.IsNullOrWhiteSpace(details) ? "" : Environment.NewLine + details));
+
+    private void OpenLog()
+    {
+        if (controller.CurrentRunDirectory is { } path && Directory.Exists(path))
+            OpenFolder(path);
+        else
+            Notify("NoLog", "Log");
+    }
+
+    private void OpenFolder(string path)
+    {
+        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
+        catch (Exception error) { Notify("NoFolder", "Folder", error.Message); }
+    }
+
+    private void RequestCancel()
+    {
+        try { controller.Cancel(); }
+        catch (Exception error) { Notify("CancelDeliveryFailed", details: error.Message); }
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs args)
+    {
+        base.OnFormClosing(args);
+        if (controller.IsBusy)
+        {
+            closePending = true;
+            RequestCancel();
+            UpdateDynamicState();
+            args.Cancel = true;
+        }
+        else if (!args.Cancel)
+            SaveSettings();
+    }
+
+    partial void InitializeAppearance();
+    partial void OpenAppearance();
+
+    private sealed class StartupLogSink : ILogSink
+    {
+        public void Write(string message) => Debug.WriteLine(message);
     }
 }

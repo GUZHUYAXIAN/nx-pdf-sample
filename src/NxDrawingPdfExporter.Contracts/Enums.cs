@@ -5,13 +5,15 @@ namespace NxDrawingPdfExporter.Contracts
     public enum ExistingPdfPolicy
     {
         Skip = 0,
-        Overwrite = 1
+        Overwrite = 1,
+        Revision = 2
     }
 
     public enum OutputMode
     {
         BesideSource = 0,
-        UnifiedDirectory = 1
+        UnifiedDirectory = 1,
+        GroupedDirectories = 2
     }
 
     public enum FileResultStatus

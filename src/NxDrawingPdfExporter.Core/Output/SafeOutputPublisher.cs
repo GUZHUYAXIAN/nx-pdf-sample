@@ -1,242 +1,163 @@
 using System;
 using System.IO;
+using NxDrawingPdfExporter.Contracts;
 using NxDrawingPdfExporter.Core.Pdf;
 
-namespace NxDrawingPdfExporter.Core.Output
+namespace NxDrawingPdfExporter.Core.Output;
+
+public enum PublicationOutcomeStatus { Published, Replaced, ValidationFailed, PublishFailed, TargetChanged }
+
+public sealed class PublicationRequest
 {
-    public enum PublicationOutcomeStatus
+    public string TempPdfPath { get; set; } = "";
+    public string FinalOutputPath { get; set; } = "";
+    public int ExpectedPageCount { get; set; }
+    public PlannedPublishIntent Intent { get; set; }
+    public TargetSnapshot? ExpectedTarget { get; set; }
+}
+
+public sealed class PublicationOutcome
+{
+    public PublicationOutcomeStatus Status { get; set; }
+    public string Message { get; set; } = "";
+    public string ReasonCode { get; set; } = ResultReasons.PublicationFailed;
+    public string TechnicalDetails { get; set; } = "";
+    public string? BackupPath { get; set; }
+    public bool OriginalPreserved { get; set; }
+}
+
+public sealed class SafeOutputPublisher
+{
+    private readonly IPdfInspector inspector;
+    private readonly IFileReplacer replacer;
+    private readonly ITargetStateReader targets;
+
+    public SafeOutputPublisher(IPdfInspector inspector, IFileReplacer replacer, ITargetStateReader? targets = null)
     {
-        /// <summary>原先没有目标文件，校验通过的新 PDF 已发布。</summary>
-        Published,
-
-        /// <summary>旧目标文件已被校验通过的新 PDF 安全覆盖。</summary>
-        Replaced,
-
-        /// <summary>临时 PDF 未通过校验，未发布任何内容。</summary>
-        ValidationFailed,
-
-        /// <summary>发布或替换失败；在覆盖场景中已尽力恢复原有文件。</summary>
-        PublishFailed
+        this.inspector = inspector ?? throw new ArgumentNullException(nameof(inspector));
+        this.replacer = replacer ?? throw new ArgumentNullException(nameof(replacer));
+        this.targets = targets ?? new PhysicalTargetStateReader();
     }
 
-    public sealed class PublicationRequest
+    public PublicationOutcome Publish(PublicationRequest request)
     {
-        public string TempPdfPath { get; set; } = "";
+        if (request is null)
+            throw new ArgumentNullException(nameof(request));
+        var expected = request.ExpectedTarget;
+        if (string.IsNullOrWhiteSpace(request.TempPdfPath) || string.IsNullOrWhiteSpace(request.FinalOutputPath)
+            || string.Equals(Path.GetFullPath(request.TempPdfPath), Path.GetFullPath(request.FinalOutputPath), StringComparison.OrdinalIgnoreCase)
+            || request.ExpectedPageCount < 1 || expected is null
+            || request.Intent != (expected.Exists ? PlannedPublishIntent.ReplaceExpected : PlannedPublishIntent.CreateNew))
+            throw new ArgumentException("Invalid frozen publication request.", nameof(request));
 
-        public string FinalOutputPath { get; set; } = "";
-
-        public int ExpectedPageCount { get; set; }
-    }
-
-    public sealed class PublicationOutcome
-    {
-        public PublicationOutcomeStatus Status { get; set; }
-
-        /// <summary>面向用户的中文结果说明，不含堆栈信息。</summary>
-        public string Message { get; set; } = "";
-
-        /// <summary>失败时原目标文件是否保持完好。</summary>
-        public bool OriginalPreserved { get; set; }
-    }
-
-    /// <summary>
-    /// 事务性发布：先完整校验 Worker 输出的临时 PDF，再原子发布或安全覆盖；
-    /// 任何失败都不会把残缺 PDF 留作正式输出。
-    /// </summary>
-    public sealed class SafeOutputPublisher
-    {
-        private readonly IPdfInspector inspector;
-        private readonly IFileReplacer replacer;
-
-        public SafeOutputPublisher(IPdfInspector inspector, IFileReplacer replacer)
+        string? backup = null;
+        try
         {
-            this.inspector = inspector ?? throw new ArgumentNullException(nameof(inspector));
-            this.replacer = replacer ?? throw new ArgumentNullException(nameof(replacer));
-        }
+            var candidate = targets.Capture(request.TempPdfPath);
+            var problem = !candidate.Exists ? "临时 PDF 不存在。"
+                : candidate.Length == 0 ? "临时 PDF 是空文件。"
+                : ValidatePdfContent(request.TempPdfPath, request.ExpectedPageCount);
+            if (problem is not null)
+                return Fail(request, PublicationOutcomeStatus.ValidationFailed, problem, expected.Exists);
+            if (!candidate.Matches(targets.Capture(request.TempPdfPath)))
+                return Fail(request, PublicationOutcomeStatus.ValidationFailed, "临时 PDF 在校验期间变化。");
+            if (!expected.Matches(targets.Capture(request.FinalOutputPath)))
+                return Fail(request, PublicationOutcomeStatus.TargetChanged, "目标已变化，请重新检查。");
 
-        public PublicationOutcome Publish(PublicationRequest request)
-        {
-            if (request is null)
+            if (request.Intent == PlannedPublishIntent.CreateNew)
             {
-                throw new ArgumentNullException(nameof(request));
-            }
-
-            if (string.IsNullOrWhiteSpace(request.TempPdfPath))
-            {
-                throw new ArgumentException("临时 PDF 路径不能为空。", nameof(request));
-            }
-
-            if (string.IsNullOrWhiteSpace(request.FinalOutputPath))
-            {
-                throw new ArgumentException("目标 PDF 路径不能为空。", nameof(request));
-            }
-
-            if (request.ExpectedPageCount < 1)
-            {
-                throw new ArgumentException("预期页数必须至少为 1。", nameof(request));
-            }
-
-            return PublishCore(request);
-        }
-
-        private PublicationOutcome PublishCore(PublicationRequest request)
-        {
-            var hadExistingTarget = File.Exists(request.FinalOutputPath);
-
-            var validationFailure = ValidateTempPdf(request);
-            if (validationFailure is not null)
-            {
-                DeleteOwnedFileIfExists(request.TempPdfPath);
-                return new PublicationOutcome
+                try
                 {
-                    Status = PublicationOutcomeStatus.ValidationFailed,
-                    Message = validationFailure,
-                    OriginalPreserved = hadExistingTarget
-                };
-            }
-
-            return hadExistingTarget ? ReplaceExisting(request) : PublishNew(request);
-        }
-
-        private string? ValidateTempPdf(PublicationRequest request)
-        {
-            if (!File.Exists(request.TempPdfPath))
-            {
-                return "临时 PDF 不存在。";
-            }
-
-            if (new FileInfo(request.TempPdfPath).Length == 0)
-            {
-                return "临时 PDF 是空文件。";
-            }
-
-            return ValidatePdfContent(request.TempPdfPath, request.ExpectedPageCount);
-        }
-
-        /// <summary>PDF 内容规则：有效文件头 + 页数与有效图纸页数一致。</summary>
-        private string? ValidatePdfContent(string path, int expectedPageCount)
-        {
-            PdfInspection inspection;
-            try
-            {
-                inspection = inspector.Inspect(path);
-            }
-            catch (Exception ex)
-            {
-                return "PDF 校验失败: " + ex.Message;
-            }
-
-            if (!inspection.HasPdfHeader)
-            {
-                return "PDF 不是有效的 PDF 文件（缺少 PDF 文件头）。";
-            }
-
-            if (inspection.PageCount != expectedPageCount)
-            {
-                return $"PDF 页数 {inspection.PageCount} 与有效图纸页数 {expectedPageCount} 不一致。";
-            }
-
-            return null;
-        }
-
-        private PublicationOutcome PublishNew(PublicationRequest request)
-        {
-            try
-            {
-                replacer.MoveIntoPlace(request.TempPdfPath, request.FinalOutputPath);
-            }
-            catch (Exception ex)
-            {
-                DeleteOwnedFileIfExists(request.TempPdfPath);
-                return new PublicationOutcome
+                    replacer.MoveIntoPlace(request.TempPdfPath, request.FinalOutputPath);
+                }
+                catch (IOException) when (File.Exists(request.FinalOutputPath))
                 {
-                    Status = PublicationOutcomeStatus.PublishFailed,
-                    Message = "发布新 PDF 失败: " + ex.Message,
-                    OriginalPreserved = false
-                };
+                    return Fail(request, PublicationOutcomeStatus.TargetChanged, "目标已变化，请重新检查。");
+                }
+                return new PublicationOutcome { Status = PublicationOutcomeStatus.Published, ReasonCode = ResultReasons.Published, Message = "PDF 已发布。" };
             }
 
-            return new PublicationOutcome
-            {
-                Status = PublicationOutcomeStatus.Published,
-                Message = "PDF 已发布。",
-                OriginalPreserved = false
-            };
-        }
+            backup = request.FinalOutputPath + "." + Guid.NewGuid().ToString("N") + ".bak.pdf";
+            replacer.ReplaceWithBackup(request.TempPdfPath, request.FinalOutputPath, backup);
+            if (!expected.Matches(targets.Capture(backup)))
+                return Fail(request, PublicationOutcomeStatus.TargetChanged, "替换期间目标发生变化，请检查备份。", backup: backup);
 
-        private PublicationOutcome ReplaceExisting(PublicationRequest request)
+            // Keep the final name stable until inspection and backup cleanup are complete.
+            // A writer already holding an incompatible handle causes the backup to be retained.
+            using var protectedTarget = new FileStream(request.FinalOutputPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            problem = ValidatePdfContent(request.FinalOutputPath, request.ExpectedPageCount);
+            var published = targets.Capture(request.FinalOutputPath);
+            if (problem is not null || !candidate.MatchesContent(published))
+                return Fail(request, PublicationOutcomeStatus.PublishFailed, problem ?? "替换后内容不一致。", backup: backup);
+
+            replacer.DeleteFile(backup);
+            return new PublicationOutcome { Status = PublicationOutcomeStatus.Replaced, ReasonCode = ResultReasons.Overwritten, Message = "PDF 已安全覆盖。" };
+        }
+        catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
         {
-            var backupPath = request.FinalOutputPath + "." + Guid.NewGuid().ToString("N") + ".bak.pdf";
-
-            try
+            // Only a non-overwriting move can recover a missing target. If another writer
+            // owns the name, keep the backup and leave their file for manual reconciliation.
+            string details = error.ToString();
+            bool recovered = false;
+            if (backup is not null && File.Exists(backup) && !File.Exists(request.FinalOutputPath))
             {
-                replacer.ReplaceWithBackup(request.TempPdfPath, request.FinalOutputPath, backupPath);
+                try
+                {
+                    if (expected.Matches(targets.Capture(backup)))
+                    {
+                        replacer.MoveIntoPlace(backup, request.FinalOutputPath);
+                        recovered = true;
+                    }
+                }
+                catch (Exception restoreError) when (restoreError is IOException || restoreError is UnauthorizedAccessException)
+                {
+                    details += Environment.NewLine + restoreError;
+                }
             }
-            catch (Exception ex)
-            {
-                return FailReplace(request, backupPath, "覆盖 PDF 失败: " + ex.Message);
-            }
-
-            if (!File.Exists(request.FinalOutputPath) || new FileInfo(request.FinalOutputPath).Length == 0)
-            {
-                return FailReplace(request, backupPath, "替换后的 PDF 无效。");
-            }
-
-            // 替换完成后必须按同一规则对最终文件复验，通过才允许删除备份；
-            // 复验失败则从备份恢复原有文件。
-            var finalFailure = ValidatePdfContent(request.FinalOutputPath, request.ExpectedPageCount);
-            if (finalFailure is not null)
-            {
-                return FailReplace(request, backupPath, "替换后的 PDF 未通过复验: " + finalFailure);
-            }
-
-            replacer.DeleteFile(backupPath);
-            return new PublicationOutcome
-            {
-                Status = PublicationOutcomeStatus.Replaced,
-                Message = "PDF 已安全覆盖。",
-                OriginalPreserved = false
-            };
+            return Fail(request, PublicationOutcomeStatus.PublishFailed, "发布 PDF 失败: " + error.Message,
+                recovered, backup, details);
         }
+    }
 
-        private PublicationOutcome FailReplace(PublicationRequest request, string backupPath, string reason)
+    private string? ValidatePdfContent(string path, int expectedPageCount)
+    {
+        PdfInspection inspection;
+        try
         {
-            var restored = RestoreFromBackup(backupPath, request.FinalOutputPath);
-            DeleteOwnedFileIfExists(request.TempPdfPath);
-            return new PublicationOutcome
-            {
-                Status = PublicationOutcomeStatus.PublishFailed,
-                Message = restored
-                    ? reason + " 已恢复原有文件。"
-                    : reason + " 且原有文件无法自动恢复，请人工检查目标目录。",
-                OriginalPreserved = restored
-            };
+            inspection = inspector.Inspect(path);
         }
-
-        private bool RestoreFromBackup(string backupPath, string finalPath)
+        catch (Exception error)
         {
-            if (!File.Exists(backupPath))
-            {
-                return false;
-            }
-
-            try
-            {
-                replacer.RestoreBackup(backupPath, finalPath);
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
+            return "PDF 校验失败: " + error.Message;
         }
+        if (!inspection.HasPdfHeader)
+            return "PDF 不是有效的 PDF 文件（缺少 PDF 文件头）。";
+        return inspection.PageCount != expectedPageCount
+            ? $"PDF 页数 {inspection.PageCount} 与有效图纸页数 {expectedPageCount} 不一致。" : null;
+    }
 
-        private void DeleteOwnedFileIfExists(string path)
+    private PublicationOutcome Fail(PublicationRequest request, PublicationOutcomeStatus status, string message,
+        bool originalPreserved = false, string? backup = null, string details = "")
+    {
+        try
         {
-            if (File.Exists(path))
-            {
-                replacer.DeleteFile(path);
-            }
+            if (File.Exists(request.TempPdfPath))
+                replacer.DeleteFile(request.TempPdfPath);
         }
+        catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+        {
+            details += Environment.NewLine + error;
+        }
+
+        var retainedBackup = backup is not null && File.Exists(backup) ? backup : null;
+        return new PublicationOutcome
+        {
+            Status = status,
+            Message = message,
+            ReasonCode = status == PublicationOutcomeStatus.TargetChanged ? ResultReasons.TargetChanged : ResultReasons.PublicationFailed,
+            TechnicalDetails = string.Join(Environment.NewLine, new[] { message, details, retainedBackup ?? "" }),
+            OriginalPreserved = originalPreserved,
+            BackupPath = retainedBackup
+        };
     }
 }

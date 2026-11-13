@@ -66,12 +66,27 @@ internal static class Program
             return 2;
         }
 
+        var policy = args[^2];
+        if (controller.ExistingPdfPolicy == ExistingPdfPolicy.Revision)
+        {
+            var plan = controller.Preflight();
+            if (policy.StartsWith("revision:", StringComparison.Ordinal))
+            {
+                foreach (var item in plan.Items)
+                    if (!controller.Session.SetRevision(item.SourcePath, policy.Substring("revision:".Length)))
+                        throw new InvalidOperationException("Invalid validation revision.");
+            }
+        }
+
+        var timeline = new System.Collections.Concurrent.ConcurrentQueue<NxDrawingPdfExporter.App.Progress.RunProgressState>();
+        controller.ProgressChanged += () => timeline.Enqueue(controller.Progress);
         var runTask = controller.RunAsync();
         if (string.Equals(args[0], "cancel", StringComparison.Ordinal))
         {
             var watchDirs = controller.ManualPaths
                 .Select(Path.GetDirectoryName!)
                 .Concat(controller.OutputMode == OutputMode.UnifiedDirectory ? new[] { controller.UnifiedOutputDirectory } : Array.Empty<string>())
+                .Concat(controller.GroupTargets.Values)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             var deadline = DateTime.UtcNow.AddMinutes(15);
@@ -105,12 +120,15 @@ internal static class Program
             discovered = discovered.Select(i => new { i.Profile.Label, i.RootDirectory, i.DetectedVersion, i.UfVersion, i.UtilitiesVersion, i.Sources }),
             selected = controller.SelectedNx,
             runDirectory = controller.CurrentRunDirectory,
+            phaseTimeline = timeline.ToArray(),
             results = controller.Results.Select(r => new
             {
                 source = r.SourcePath,
                 target = r.FinalOutputPath,
                 status = r.Status.ToString(),
                 message = r.Message,
+                reasonCode = r.ReasonCode,
+                technicalDetails = r.TechnicalDetails,
                 exportedSheetCount = r.ExportedSheets.Length
             }),
             summary = controller.SummaryText,
@@ -132,9 +150,26 @@ internal static class Program
             controller.UnifiedOutputDirectory = unified;
         }
 
-        controller.ExistingPdfPolicy = policy == "overwrite"
-            ? ExistingPdfPolicy.Overwrite
-            : ExistingPdfPolicy.Skip;
+        if (mode == "grouped")
+        {
+            controller.OutputMode = OutputMode.GroupedDirectories;
+            var directories = controller.ManualPaths.Select(Path.GetDirectoryName)
+                .OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            for (var index = 0; index < directories.Length; index++)
+            {
+                var target = Path.Combine(unified, "group-" + (index + 1));
+                Directory.CreateDirectory(target);
+                controller.GroupTargets[directories[index]] = target;
+            }
+        }
+
+        controller.ExistingPdfPolicy = policy switch
+        {
+            "overwrite" => ExistingPdfPolicy.Overwrite,
+            "revision" => ExistingPdfPolicy.Revision,
+            _ when policy.StartsWith("revision:", StringComparison.Ordinal) => ExistingPdfPolicy.Revision,
+            _ => ExistingPdfPolicy.Skip
+        };
     }
 
     private sealed class ConsoleLogSink : NxDrawingPdfExporter.App.Logging.ILogSink

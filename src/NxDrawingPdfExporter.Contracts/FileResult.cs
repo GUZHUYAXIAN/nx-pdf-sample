@@ -28,5 +28,14 @@ namespace NxDrawingPdfExporter.Contracts
 
         [DataMember(Order = 7)]
         public long ElapsedMilliseconds { get; set; }
+
+        [DataMember(Order = 8, IsRequired = true)]
+        public string ReasonCode { get; set; } = ResultReasons.Unknown;
+
+        [DataMember(Order = 9, IsRequired = true)]
+        public string[] ReasonArguments { get; set; } = System.Array.Empty<string>();
+
+        [DataMember(Order = 10, IsRequired = true)]
+        public string TechnicalDetails { get; set; } = "";
     }
 }

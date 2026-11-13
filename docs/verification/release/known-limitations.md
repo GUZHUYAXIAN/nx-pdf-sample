@@ -69,3 +69,11 @@ actual display acceptance remains pending. No other NX version is supported.
 9. **V1 scope only.** No STEP/DWG/DXF/CGM/3D-PDF output, no Teamcenter/PDM,
    no folder watching, no parallel exports, no drawing editing, and no
    installer or auto-update. Product runtime never contacts the network.
+
+## 2.1.0 local candidate
+
+- Supported installations are the exact NX 10 and NX 2506 component sets documented in the README.
+- This old drawing still renders angle and dimension annotations differently in NX 2506. Native NX 2506 drawings, alternative installations, and other computers remain unverified.
+- Safe replacement targets ordinary local Windows filesystems. A competing operation during replacement can require inspecting the retained backup. The tool does not overwrite an unknown destination while restoring. Network shares and filesystem aliases have not been qualified.
+- GUI, 100%/125%/150% DPI, skin effects and physical offline acceptance are pending. The candidate's file integrity and headless NX evidence are recorded separately.
+- The character illustrations are locally bundled generated fan art. See the source notice in assets/themes.

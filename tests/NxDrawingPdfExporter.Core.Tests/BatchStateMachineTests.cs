@@ -88,6 +88,28 @@ namespace NxDrawingPdfExporter.Core.Tests
         }
 
         [TestMethod]
+        public void ObserverCountsOnlyItemsWithPersistedAuthoritativeSnapshots()
+        {
+            var first = NewItem("a");
+            var second = NewItem("b");
+            var cancel = new FakeCancellation();
+            var machine = new BatchStateMachine(new FakeProcessor(StatusResult(first, FileResultStatus.Success)), new FakeProbe(), cancel);
+            var steps = new List<string>();
+            var result = machine.Run(NewRequest(first, second), snapshot: snapshot =>
+            {
+                steps.Add("persist " + snapshot.Files.Length);
+                cancel.IsRequested = true;
+            }, observer: progress => steps.Add(progress.Completed ? "end " + progress.ItemIndex : "start " + progress.ItemIndex));
+            CollectionAssert.AreEqual(new[] { "start 0", "persist 1", "end 0" }, steps);
+            Assert.AreEqual(FileResultStatus.Cancelled, result.Files[1].Status);
+            cancel.IsRequested = false;
+            steps.Clear();
+            Assert.ThrowsExactly<IOException>(() => machine.Run(NewRequest(first),
+                snapshot: _ => throw new IOException(), observer: p => steps.Add(p.Completed ? "end" : "start")));
+            CollectionAssert.AreEqual(new[] { "start" }, steps);
+        }
+
+        [TestMethod]
         public void Run_SingleFileFailure_ContinuesToNextFile()
         {
             var item1 = NewItem("a");
@@ -121,7 +143,7 @@ namespace NxDrawingPdfExporter.Core.Tests
         }
 
         [TestMethod]
-        public void Run_SkipPolicyWithExistingTarget_DoesNotStartWorkerExport()
+        public void Run_SkipPolicyWithNewTarget_FailsWithoutExport()
         {
             var item1 = NewItem("a");
             var item2 = NewItem("b");
@@ -133,7 +155,8 @@ namespace NxDrawingPdfExporter.Core.Tests
             var result = machine.Run(request);
 
             CollectionAssert.AreEqual(new[] { item2.SourcePath }, processor.Processed);
-            Assert.AreEqual(FileResultStatus.SkippedExisting, result.Files[0].Status);
+            Assert.AreEqual(FileResultStatus.Failed, result.Files[0].Status);
+            Assert.AreEqual(ResultReasons.TargetChanged, result.Files[0].ReasonCode);
             Assert.AreEqual(FileResultStatus.Success, result.Files[1].Status);
         }
 

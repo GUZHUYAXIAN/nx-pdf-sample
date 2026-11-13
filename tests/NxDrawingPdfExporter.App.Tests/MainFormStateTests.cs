@@ -14,6 +14,24 @@ namespace NxDrawingPdfExporter.App.Tests;
 public sealed class MainFormStateTests
 {
     [TestMethod]
+    public void ManualListVisibilityCanChangeWithoutChangingMode()
+    {
+        var state = new ManualListState();
+        Assert.IsFalse(state.Expanded);
+        state.Toggle();
+        Assert.IsTrue(state.Expanded);
+        Assert.IsFalse(state.CanEdit);
+        state.Select(GuiInputMode.ManualSelection);
+        Assert.IsTrue(state.Expanded);
+        Assert.IsTrue(state.CanEdit);
+        state.Toggle();
+        Assert.IsTrue(state.CanEdit);
+        Assert.IsFalse(state.Expanded);
+        state.Select(GuiInputMode.ScanFolder);
+        Assert.IsFalse(state.Expanded);
+    }
+
+    [TestMethod]
     [DataRow(@"c:\nx-a", @"E:\NX-B", @"C:\NX-A")]
     [DataRow(@"F:\removed", @"E:\NX-B", @"E:\NX-B")]
     [DataRow(null, @"E:\NX-B", @"E:\NX-B")]

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -62,6 +62,9 @@ namespace NxDrawingPdfExporter.Contracts.Tests
                 FinalOutputPath = @"E:\目 标\文件" + index + ".pdf",
                 Status = status,
                 Message = "映射的中文结果消息 " + index,
+                ReasonCode = ResultReasons.MissingModel,
+                ReasonArguments = new[] { "A", "B" },
+                TechnicalDetails = "NX details",
                 ExportedSheets = status == FileResultStatus.Success ? new[] { "页A", "Sheet 02" } : Array.Empty<string>(),
                 SkippedSheets = status == FileResultStatus.Success ? new[] { "模板页-图框" } : Array.Empty<string>(),
                 ElapsedMilliseconds = 1000 + index
@@ -86,7 +89,7 @@ namespace NxDrawingPdfExporter.Contracts.Tests
             var json = JobJsonSerializer.Serialize(request);
             var back = JobJsonSerializer.Deserialize<JobRequest>(json);
 
-            Assert.AreEqual(ProtocolVersion.Current, back.ProtocolVersion);
+            Assert.AreEqual("2", back.ProtocolVersion);
             Assert.AreEqual(request.RunId, back.RunId);
             Assert.AreEqual(request.OutputMode, back.OutputMode);
             Assert.AreEqual(request.ExistingPdfPolicy, back.ExistingPdfPolicy);
@@ -125,6 +128,9 @@ namespace NxDrawingPdfExporter.Contracts.Tests
                 back.Files.Select(f => f.Status).ToArray());
 
             var success = back.Files.Single(f => f.Status == FileResultStatus.Success);
+            Assert.AreEqual(ResultReasons.MissingModel, success.ReasonCode);
+            CollectionAssert.AreEqual(new[] { "A", "B" }, success.ReasonArguments);
+            Assert.AreEqual("NX details", success.TechnicalDetails);
             CollectionAssert.AreEqual(new[] { "页A", "Sheet 02" }, success.ExportedSheets);
             CollectionAssert.AreEqual(new[] { "模板页-图框" }, success.SkippedSheets);
         }
@@ -143,9 +149,32 @@ namespace NxDrawingPdfExporter.Contracts.Tests
         }
 
         [TestMethod]
+        public void GroupedRevisionRequest_UsesEachExplicitOutputPath()
+        {
+            var request = BuildFullRequest();
+            request.OutputMode = (OutputMode)2;
+            request.ExistingPdfPolicy = (ExistingPdfPolicy)2;
+            request.UnifiedOutputDirectory = null;
+            var back = JobJsonSerializer.Deserialize<JobRequest>(JobJsonSerializer.Serialize(request));
+            CollectionAssert.AreEqual(request.Items.Select(i => i.FinalOutputPath).ToArray(),
+                back.Items.Select(i => i.FinalOutputPath).ToArray());
+        }
+
+        [TestMethod]
+        public void Deserialize_ProtocolOne_Throws()
+        {
+            var request = BuildFullRequest();
+            request.ProtocolVersion = "1";
+            Assert.ThrowsExactly<ProtocolException>(() =>
+                JobJsonSerializer.Deserialize<JobRequest>(JobJsonSerializer.Serialize(request)));
+        }
+
+        [TestMethod]
         public void Deserialize_UnknownProtocolVersion_Throws()
         {
-            var json = JobJsonSerializer.Serialize(BuildFullRequest()).Replace("\"ProtocolVersion\":\"1\"", "\"ProtocolVersion\":\"999\"");
+            var request = BuildFullRequest();
+            request.ProtocolVersion = "999";
+            var json = JobJsonSerializer.Serialize(request);
 
             Assert.ThrowsExactly<ProtocolException>(() => JobJsonSerializer.Deserialize<JobRequest>(json));
         }
@@ -156,6 +185,29 @@ namespace NxDrawingPdfExporter.Contracts.Tests
             var json = JobJsonSerializer.Serialize(BuildFullRequest()).Replace("\"ExistingPdfPolicy\":1", "\"ExistingPdfPolicy\":42");
 
             Assert.ThrowsExactly<ProtocolException>(() => JobJsonSerializer.Deserialize<JobRequest>(json));
+        }
+
+        [TestMethod]
+        [DataRow(@"E:temp.pdf")]
+        [DataRow(@"\temp.pdf")]
+        public void DriveRelativeTempPathIsRejected(string temp)
+        {
+            var request = BuildFullRequest();
+            request.Items[0].WorkerTempOutputPath = temp;
+            Assert.ThrowsExactly<ProtocolException>(() =>
+                JobJsonSerializer.Deserialize<JobRequest>(JobJsonSerializer.Serialize(request)));
+        }
+
+        [TestMethod]
+        public void WorkerTemporaryPathCannotAliasFinalOrSource()
+        {
+            var request = BuildFullRequest();
+            request.Items[0].WorkerTempOutputPath = request.Items[0].FinalOutputPath;
+            Assert.ThrowsExactly<ProtocolException>(() =>
+                JobJsonSerializer.Deserialize<JobRequest>(JobJsonSerializer.Serialize(request)));
+            request.Items[0].WorkerTempOutputPath = request.Items[0].SourcePath;
+            Assert.ThrowsExactly<ProtocolException>(() =>
+                JobJsonSerializer.Deserialize<JobRequest>(JobJsonSerializer.Serialize(request)));
         }
 
         [TestMethod]
@@ -268,7 +320,7 @@ namespace NxDrawingPdfExporter.Contracts.Tests
         [TestMethod]
         public void Deserialize_NullItemsArray_Throws()
         {
-            var json = "{\"ProtocolVersion\":\"1\",\"RunId\":\"r\",\"Items\":null,\"OutputMode\":0,\"ExistingPdfPolicy\":0,\"ResultPath\":\"C:\\\\a\\\\result.json\",\"CancellationFlagPath\":\"C:\\\\a\\\\cancel.flag\"}";
+            var json = "{\"ProtocolVersion\":\"2\",\"RunId\":\"r\",\"Items\":null,\"OutputMode\":0,\"ExistingPdfPolicy\":0,\"ResultPath\":\"C:\\\\a\\\\result.json\",\"CancellationFlagPath\":\"C:\\\\a\\\\cancel.flag\"}";
 
             Assert.ThrowsExactly<ProtocolException>(() => JobJsonSerializer.Deserialize<JobRequest>(json));
         }

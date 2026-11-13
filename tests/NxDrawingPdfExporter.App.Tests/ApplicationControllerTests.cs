@@ -95,6 +95,7 @@ namespace NxDrawingPdfExporter.App.Tests
             var controller = NewController();
             controller.ScanFolderPath = Path.Combine(scratch, "in");
             launcher.OmitResult = mode == "missing";
+            launcher.WriteAdvisorySuccess = true;
             launcher.MutateResult = result => {
                 if (mode == "stale") { result.StartedUtc = DateTime.UtcNow.AddDays(-1); result.EndedUtc = result.StartedUtc; }
                 if (mode == "target") result.Files[0].FinalOutputPath = Path.Combine(scratch, "unexpected.pdf");
@@ -103,10 +104,28 @@ namespace NxDrawingPdfExporter.App.Tests
                 if (mode == "incomplete") result.Completed = false;
             };
             await controller.RunAsync();
+            Assert.IsFalse(controller.Progress.PublicationReached);
             Assert.AreEqual(0, controller.Results.Count(r => r.Status is FileResultStatus.Success or FileResultStatus.Overwritten));
             Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing1.pdf")));
             Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing2.pdf")));
             Assert.IsEmpty(Directory.GetFiles(Path.Combine(scratch, "in"), "*.tmp.pdf"));
+        }
+
+        [TestMethod]
+        public async Task Cancel_WhileCheckingWorkerResult_PublishesCompletedFiles()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            controller.ProgressChanged += () =>
+            {
+                if (controller.Progress is { Phase: NxDrawingPdfExporter.App.Progress.RunPhase.CheckingWorkerResult, CancelRequested: false })
+                    controller.Cancel();
+            };
+
+            await controller.RunAsync();
+
+            Assert.AreEqual(2, controller.Progress.Publication.Saved);
+            Assert.IsFalse(File.Exists(Path.Combine(controller.CurrentRunDirectory!, "cancel.flag")));
         }
 
         [TestMethod]
@@ -120,7 +139,9 @@ namespace NxDrawingPdfExporter.App.Tests
             var controller = NewController(services);
             controller.ScanFolderPath = Path.Combine(scratch, "in");
             await controller.RunAsync();
-            Assert.AreEqual(selected, launcher.LaunchCalls.Single().Installation);
+            var installation = launcher.LaunchCalls.Single().Installation!;
+            Assert.AreEqual(selected, installation with { Sources = selected.Sources });
+            CollectionAssert.AreEqual(selected.Sources.ToArray(), installation.Sources.ToArray());
             Assert.AreEqual(selected.LauncherPath, launcher.LaunchCalls.Single().NxLauncherPath);
             StringAssert.Contains(controller.NxStatusMessage, "NX 2506");
         }
@@ -131,7 +152,7 @@ namespace NxDrawingPdfExporter.App.Tests
 
             Assert.AreEqual(GuiInputMode.ScanFolder, controller.InputMode);
             Assert.IsFalse(controller.IncludeSubfolders);
-            Assert.AreEqual(OutputMode.BesideSource, controller.OutputMode);
+            Assert.AreEqual(OutputMode.GroupedDirectories, controller.OutputMode);
             Assert.AreEqual(ExistingPdfPolicy.Skip, controller.ExistingPdfPolicy);
             Assert.IsFalse(controller.IsBusy);
         }
@@ -248,6 +269,59 @@ namespace NxDrawingPdfExporter.App.Tests
         }
 
         [TestMethod]
+        public async Task RevisionEditIsFrozenAndHistoryChangeDuringWorkerBlocksOnlyThatItem()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            controller.ExistingPdfPolicy = ExistingPdfPolicy.Revision;
+            var plan = controller.Preflight();
+            var source = plan.Items[0].SourcePath;
+            Assert.IsTrue(controller.Session.SetRevision(source, "R2"));
+            controller.Preflight();
+            launcher.MutateResult = _ =>
+                File.WriteAllText(Path.Combine(scratch, "in", "drawing1-R7.pdf"), "external history");
+            await controller.RunAsync();
+            Assert.AreEqual(FileResultStatus.Failed, controller.Results[0].Status);
+            Assert.AreEqual(ResultReasons.TargetChanged, controller.Results[0].ReasonCode);
+            Assert.AreEqual("drawing1-R2.pdf", Path.GetFileName(controller.Results[0].FinalOutputPath));
+            Assert.IsFalse(File.Exists(controller.Results[0].FinalOutputPath));
+            Assert.AreEqual(FileResultStatus.Success, controller.Results[1].Status);
+            Assert.AreEqual(2, controller.Preflight().Items[0].ChosenRevision);
+        }
+
+        [TestMethod]
+        public async Task RevisionEditDoesNotReapproveExternalHistoryChangesOnAnotherItem()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            controller.ExistingPdfPolicy = ExistingPdfPolicy.Revision;
+            var plan = controller.Preflight();
+            File.WriteAllText(Path.Combine(scratch, "in", "drawing2-R7.pdf"), "external history");
+            Assert.IsTrue(controller.Session.SetRevision(plan.Items[0].SourcePath, "R2"));
+
+            await controller.RunAsync();
+
+            Assert.IsEmpty(launcher.LaunchCalls);
+            Assert.IsTrue(controller.Session.IsStale);
+            var refreshed = controller.Preflight();
+            Assert.AreEqual(2, refreshed.Items[0].ChosenRevision);
+            Assert.AreEqual(8, refreshed.Items[1].SuggestedRevision);
+        }
+
+        [TestMethod]
+        public async Task ChangedHistoryBeforeRunDoesNotLaunchOrSelectAnotherRevision()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            controller.ExistingPdfPolicy = ExistingPdfPolicy.Revision;
+            controller.Preflight();
+            File.WriteAllText(Path.Combine(scratch, "in", "drawing1-R7.pdf"), "external history");
+            await controller.RunAsync();
+            Assert.IsEmpty(launcher.LaunchCalls);
+            Assert.IsTrue(controller.Session.IsStale);
+        }
+
+        [TestMethod]
         public async Task Run_UnifiedNameConflict_IsBlockedWithoutLaunch()
         {
             Directory.CreateDirectory(Path.Combine(scratch, "in2"));
@@ -308,6 +382,45 @@ namespace NxDrawingPdfExporter.App.Tests
 
             Assert.IsTrue(controller.Results.All(r => r.Status == FileResultStatus.Failed));
             Assert.IsFalse(File.Exists(Path.Combine(scratch, "in", "drawing1.pdf")));
+        }
+
+        [TestMethod]
+        public async Task CancelDuringPreparationStopsBeforeWorkerLaunch()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            controller.ProgressChanged += () =>
+            {
+                if (controller.Progress.Phase == NxDrawingPdfExporter.App.Progress.RunPhase.Preparing)
+                    controller.Cancel();
+            };
+            await controller.RunAsync();
+            Assert.IsEmpty(launcher.LaunchCalls);
+            Assert.IsTrue(controller.Progress.CancelRequested);
+            Assert.AreEqual(NxDrawingPdfExporter.App.Progress.RunPhase.Cancelled, controller.Progress.Phase);
+        }
+
+        [TestMethod]
+        public async Task PublicationDenominatorAndCurrentPathExcludeSkippedAndFailedEntries()
+        {
+            var controller = NewController();
+            controller.ScanFolderPath = Path.Combine(scratch, "in");
+            File.WriteAllText(Path.Combine(scratch, "in", "drawing0.prt"), "fixture");
+            File.WriteAllText(Path.Combine(scratch, "in", "drawing0.pdf"), "already exists");
+            launcher.FailForSourceContains = "drawing1";
+            var active = new List<string>();
+            controller.ProgressChanged += () =>
+            {
+                if (controller.Progress.Phase == NxDrawingPdfExporter.App.Progress.RunPhase.Publishing &&
+                    controller.Progress.CurrentSourcePath is { } path)
+                    active.Add(Path.GetFileName(path));
+            };
+            await controller.RunAsync();
+            Assert.AreEqual(2, controller.Progress.Export.Total);
+            Assert.AreEqual(1, controller.Progress.Skipped);
+            Assert.AreEqual(1, controller.Progress.Publication.Total);
+            Assert.AreEqual(1, controller.Progress.Publication.Saved);
+            CollectionAssert.AreEqual(new[] { "drawing2.prt" }, active);
         }
 
         [TestMethod]
@@ -668,6 +781,7 @@ namespace NxDrawingPdfExporter.App.Tests
             /// <summary>模拟 Worker 写出损坏的 result.json（结果不可读）。</summary>
             public bool WriteInvalidResultJson { get; set; }
             public bool OmitResult { get; set; }
+            public bool WriteAdvisorySuccess { get; set; }
             public Action<JobResult>? MutateResult { get; set; }
 
             /// <summary>模拟 Worker 写出属于其他运行的结果文件。</summary>
@@ -786,6 +900,12 @@ namespace NxDrawingPdfExporter.App.Tests
                     Cancelled = cancellationObserved
                     , Completed = true
                 };
+                if (WriteAdvisorySuccess)
+                    WorkerProgressJson.WriteAtomic(new WorkerProgressSnapshot
+                    {
+                        RunId = job.RunId, Sequence = 1, Stage = WorkerProgressStage.Finished,
+                        Total = job.Items.Length, Processed = job.Items.Length, Generated = job.Items.Length
+                    }, Path.Combine(request.RunDirectory, WorkerProgressJson.FileName));
                 MutateResult?.Invoke(result);
                 if (WriteInvalidResultJson)
                 {

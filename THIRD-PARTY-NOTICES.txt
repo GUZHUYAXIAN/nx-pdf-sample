@@ -1,7 +1,8 @@
 Third-Party Notices
 ===================
 
-This distribution includes third-party software licensed under the terms below.
+This distribution includes third-party software and bundled illustrations. The
+software license and illustration attribution are documented below.
 
 -------------------------------------------------------------------------------
 
@@ -43,5 +44,16 @@ SOFTWARE.
 -------------------------------------------------------------------------------
 
 Siemens NXOpen assemblies (NXOpen.dll, NXOpen.UF.dll) are NOT included in this
-distribution. They remain part of the local Siemens NX 10 installation and are
-loaded from there at runtime.
+distribution. The separate Workers load these assemblies from the selected local
+Siemens NX 10 or NX 2506 installation at runtime.
+
+-------------------------------------------------------------------------------
+
+Bundled character illustrations
+-------------------------------
+The four presets contain AI-generated fan illustrations of characters from
+Re:Zero, Guilty Crown, Frieren: Beyond Journey's End, and Mushoku Tensei.
+Character and franchise rights remain with their respective rights holders.
+See assets/themes/SOURCES.txt in the portable package, or
+src/NxDrawingPdfExporter.App/Assets/Themes/SOURCES.txt in the source tree, for
+character names, generation details, and provenance.

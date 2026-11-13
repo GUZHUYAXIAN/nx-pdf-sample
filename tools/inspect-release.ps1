@@ -14,7 +14,8 @@
 param(
     [string]$PackageRoot,
     [string]$ManifestPath,
-    [switch]$VerifyManifestOnly
+    [switch]$VerifyManifestOnly,
+    [string]$CandidateVersion
 )
 
 $ErrorActionPreference = 'Stop'
@@ -56,6 +57,10 @@ function Get-ManifestProblems {
         }
 
         $covered[$relative] = $true
+        if ([IO.Path]::IsPathRooted($relative) -or ($relative -split '[\\/]' -contains '..')) {
+            $found += (' Invalid manifest relative path: ' + $relative)
+            continue
+        }
         $full = Join-Path $PackageRoot $relative
         if (-not (Test-Path -LiteralPath $full)) {
             $found += (' 清单引用了包内不存在的文件: ' + $relative)
@@ -78,7 +83,77 @@ function Get-ManifestProblems {
     return $found
 }
 
-$files = @(Get-ChildItem $PackageRoot -Recurse -File)
+$PackageRoot = (Resolve-Path -LiteralPath $PackageRoot).Path.TrimEnd('\')
+$files = @(Get-ChildItem -LiteralPath $PackageRoot -Recurse -File -Force)
+
+if ($CandidateVersion) {
+    $expected = @('NX图纸批量导出工具.exe','LICENSE','THIRD-PARTY-NOTICES.txt','说明.txt','build-info.txt',
+        'en\NxDrawingPdfExporter.App.resources.dll','assets\themes\SOURCES.txt')
+    $workers = @(
+        @{ Root='worker\nx10'; Exe='NxDrawingPdfExporter.Worker.exe' },
+        @{ Root='worker\nx2506'; Exe='NxDrawingPdfExporter.Worker.Nx2506.exe' }
+    )
+    foreach ($worker in $workers) {
+        foreach ($fileName in @($worker.Exe, ($worker.Exe+'.config'), 'NxDrawingPdfExporter.Contracts.dll', 'NxDrawingPdfExporter.Core.dll')) {
+            $expected += Join-Path $worker.Root $fileName
+        }
+    }
+    $ids = @('rem','inori','frieren','roxy')
+    foreach ($id in $ids) {
+        foreach ($suffix in @('.png','-thumb.png','.json')) { $expected += 'assets\themes\' + $id + $suffix }
+    }
+    $relativeFiles = @($files | ForEach-Object { Get-PackageRelativePath -File $_ })
+    $difference = @(Compare-Object -ReferenceObject $expected -DifferenceObject $relativeFiles -CaseSensitive)
+    if ($difference.Count) {
+        throw ('Invalid candidate layout: ' + (($difference | ForEach-Object { $_.SideIndicator + ' ' + $_.InputObject }) -join ', '))
+    }
+    $null = [Reflection.Assembly]::ReflectionOnlyLoad('netstandard, Version=2.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51')
+    $contractsHash = $null
+    foreach ($worker in $workers) {
+        $directory = Join-Path $PackageRoot $worker.Root
+        foreach ($name in @($worker.Exe, 'NxDrawingPdfExporter.Contracts.dll', 'NxDrawingPdfExporter.Core.dll')) {
+            $path = Join-Path $directory $name
+            if ([Reflection.AssemblyName]::GetAssemblyName($path).Version -ne [version]($CandidateVersion + '.0')) {
+                throw "Wrong candidate version: $($worker.Root)\$name"
+            }
+        }
+        $contractPath = Join-Path $directory 'NxDrawingPdfExporter.Contracts.dll'
+        $hash = (Get-FileHash -LiteralPath $contractPath -Algorithm SHA256).Hash
+        if ($null -eq $contractsHash) {
+            $contract = [Reflection.Assembly]::ReflectionOnlyLoad([IO.File]::ReadAllBytes($contractPath))
+            $type = $contract.GetType('NxDrawingPdfExporter.Contracts.ProtocolVersion', $true)
+            if ($type.GetField('Current').GetRawConstantValue() -cne '2') {
+                throw "Incompatible Worker protocol: $($worker.Root)"
+            }
+            $contractsHash = $hash
+        }
+        elseif ($hash -cne $contractsHash) {
+            throw "The two Workers contain different protocol assemblies."
+        }
+    }
+    $resources = [Reflection.Assembly]::ReflectionOnlyLoad([IO.File]::ReadAllBytes(
+        (Join-Path $PackageRoot 'en\NxDrawingPdfExporter.App.resources.dll')))
+    if ($resources.GetName().CultureName -cne 'en' -or
+        $resources.GetName().Version -ne [version]($CandidateVersion + '.0') -or
+        $resources.GetManifestResourceNames() -cnotcontains 'NxDrawingPdfExporter.App.Localization.Strings.en.resources') {
+        throw 'Invalid English resource satellite.'
+    }
+    Add-Type -AssemblyName System.Drawing
+    foreach ($id in $ids) {
+        $definition = Get-Content -LiteralPath (Join-Path $PackageRoot ('assets\themes\' + $id + '.json')) -Raw | ConvertFrom-Json
+        if ($definition.id -cne $id -or $null -eq $definition.parameters) { throw "Invalid theme definition: $id" }
+        foreach ($variant in @($id, ($id + '-thumb'))) {
+            $image = [Drawing.Image]::FromFile((Join-Path $PackageRoot ('assets\themes\' + $variant + '.png')))
+            try {
+                $minimum = if ($variant -eq $id) { 1500 } else { 320 }
+                if ($image.RawFormat.Guid -ne [Drawing.Imaging.ImageFormat]::Png.Guid -or $image.Width -lt $minimum -or
+                    [Math]::Abs(($image.Width / $image.Height) - (16.0 / 9)) -gt .02) {
+                    throw "Invalid bundled theme image: $variant"
+                }
+            } finally { $image.Dispose() }
+        }
+    }
+}
 
 if ($VerifyManifestOnly) {
     $verifyProblems = @(Get-ManifestProblems -ManifestFile $ManifestPath)

@@ -11,7 +11,7 @@ namespace NxDrawingPdfExporter.Worker
     /// Worker 内的顺序批处理：一个 NX 会话逐个处理 job 条目，
     /// 通过 Core 状态机推进，并在每个文件后原子重写权威 result.json。
     /// </summary>
-    internal sealed class NxBatchRunner
+    internal sealed class NxBatchRunner(WorkerProgressReporter? progress = null)
     {
         /// <summary>仅测试使用的条目处理器替换点；生产代码不得设置。null = 真实 NX 处理器。</summary>
         internal static Func<IBatchItemProcessor>? ProcessorOverride { get; set; }
@@ -31,7 +31,13 @@ namespace NxDrawingPdfExporter.Worker
                 new TargetProbe(),
                 new CancellationFlag(request.CancellationFlagPath));
             var snapshotWriter = SnapshotWriterOverride ?? DefaultSnapshotWriter;
-            return machine.Run(request, null, snapshot => snapshotWriter(snapshot, request.ResultPath));
+            return machine.Run(request, null, snapshot => snapshotWriter(snapshot, request.ResultPath), update =>
+            {
+                if (update.Result is { } item)
+                    progress?.CompleteItem(item);
+                else
+                    progress?.Step(WorkerProgressStage.CheckingItem, update.ItemIndex);
+            });
         }
 
         private static void DefaultSnapshotWriter(JobResult result, string resultPath)
@@ -42,15 +48,16 @@ namespace NxDrawingPdfExporter.Worker
         private IBatchItemProcessor CreateProcessor()
         {
             var factory = ProcessorOverride;
-            return factory is not null ? factory() : CreateNxProcessor();
+            return factory is not null ? factory() : CreateNxProcessor(progress);
         }
 
         // 非 内联：保证测试替换处理器时，NXOpen 依赖的类型加载不会发生。
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static NxJobItemProcessor CreateNxProcessor()
+        private static NxJobItemProcessor CreateNxProcessor(WorkerProgressReporter? progress)
         {
             NxRuntimeGuard.Verify();
-            return new NxJobItemProcessor();
+            progress?.Step(WorkerProgressStage.Ready);
+            return new NxJobItemProcessor(progress);
         }
 
         private sealed class TargetProbe : IBatchTargetProbe
@@ -58,13 +65,14 @@ namespace NxDrawingPdfExporter.Worker
             public bool TargetExists(string finalOutputPath) => File.Exists(finalOutputPath);
         }
 
-        private sealed class NxJobItemProcessor : IBatchItemProcessor
+        private sealed class NxJobItemProcessor(WorkerProgressReporter? progress) : IBatchItemProcessor
         {
             private readonly NxFileJobRunner runner = new NxFileJobRunner();
 
             public FileResult Process(JobItem item)
             {
-                var report = runner.ExportSingle(item.SourcePath, item.WorkerTempOutputPath, out var nameMap);
+                var report = runner.ExportSingle(item.SourcePath, item.WorkerTempOutputPath, out var nameMap,
+                    stage => progress?.Step(stage, progress.CurrentItemIndex));
                 var exported = report.Sheets.Where(s => s.Selected).ToArray();
                 var skipped = report.Sheets.Where(s => !s.Selected).ToArray();
                 return new FileResult
@@ -72,6 +80,8 @@ namespace NxDrawingPdfExporter.Worker
                     SourcePath = item.SourcePath,
                     FinalOutputPath = item.FinalOutputPath,
                     Status = report.Outcome,
+                    ReasonCode = report.Success ? ResultReasons.TemporaryPdfReady : report.ReasonCode,
+                    TechnicalDetails = report.TechnicalDetails,
                     Message = report.Success ? "临时 PDF 已生成，等待验证发布。" : report.Failure ?? "导出失败。",
                     ExportedSheets = nameMap is null
                         ? Array.Empty<string>()

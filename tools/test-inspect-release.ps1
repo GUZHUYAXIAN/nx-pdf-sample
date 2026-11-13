@@ -1,5 +1,5 @@
 ﻿# Self-test for tools\inspect-release.ps1 using disposable fixture packages
-# under the system temp directory. Covers the CR-07/CR-08 regressions:
+# under the project's artifacts directory. Covers the CR-07/CR-08 regressions:
 #   1. A binary payload embedding a developer checkout path fails inspection.
 #   2. A clean fixture with Chinese/space filenames produces a UTF-8 manifest
 #      whose entries round-trip exactly and verify byte-for-byte.
@@ -7,11 +7,14 @@
 #
 # Usage (Windows PowerShell 5.1):
 #   powershell -NoProfile -File tools\test-inspect-release.ps1
+param([string]$CandidatePackage)
+
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $inspector = Join-Path $PSScriptRoot 'inspect-release.ps1'
-$fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('nxpdf-inspect-test-' + [Guid]::NewGuid().ToString('N'))
+$artifacts = [IO.Path]::GetFullPath((Join-Path $repoRoot 'artifacts')) + '\'
+$fixtureRoot = Join-Path $artifacts ('nxpdf-inspect-test-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fixtureRoot | Out-Null
 
 function Invoke-Inspector {
@@ -129,8 +132,70 @@ try {
     if ($noiseExit -ne 0) { throw '二进制噪声被误判为路径。' }
     Write-Host 'PASS：无源码/构建指示符的二进制噪声不误报。'
 
+    try {
+        & $inspector -PackageRoot $cleanPackage -ManifestPath $cleanManifest -CandidateVersion '2.1.0'
+        throw 'The incomplete candidate passed the strict layout check.'
+    }
+    catch {
+        if ($_.Exception.Message -notlike '*candidate layout*') { throw }
+    }
+    if ($CandidatePackage) {
+        $candidate = Join-Path $fixtureRoot 'full-candidate'
+        Copy-Item -LiteralPath $CandidatePackage -Destination $candidate -Recurse
+        $auditManifest = Join-Path $fixtureRoot 'candidate.sha256'
+
+        function Invoke-CandidateAudit([string]$ExpectedError) {
+            $ErrorActionPreference = 'Continue'
+            $output = & powershell -NoProfile -File $inspector -PackageRoot $candidate -ManifestPath $auditManifest -CandidateVersion '2.1.0' 2>&1
+            $code = $LASTEXITCODE
+            if (!$ExpectedError -and $code -ne 0) { throw ($output | Out-String) }
+            if ($ExpectedError -and ($code -eq 0 -or ($output | Out-String) -notmatch $ExpectedError)) {
+                throw ("Expected rejection '$ExpectedError'. Actual: " + ($output | Out-String))
+            }
+        }
+
+        Invoke-CandidateAudit
+        $held = Join-Path $fixtureRoot 'held-file'
+        foreach ($required in @('assets\themes\rem.png','assets\themes\inori-thumb.png','assets\themes\frieren.json','en\NxDrawingPdfExporter.App.resources.dll')) {
+            $file = Join-Path $candidate $required
+            Move-Item -LiteralPath $file -Destination $held
+            try { Invoke-CandidateAudit 'Invalid candidate layout' }
+            finally { Move-Item -LiteralPath $held -Destination $file }
+        }
+
+        $correct = Join-Path $candidate 'assets\themes\roxy.png'
+        $wrong = Join-Path $candidate 'roxy.png'
+        Move-Item -LiteralPath $correct -Destination $wrong
+        try { Invoke-CandidateAudit 'Invalid candidate layout' }
+        finally { Move-Item -LiteralPath $wrong -Destination $correct }
+
+        foreach ($extra in @('user-import.png','NXOpen.dll','private.prt','unexpected.pdf')) {
+            $path = Join-Path $candidate $extra
+            [IO.File]::WriteAllBytes($path, @(0,1,2))
+            try { Invoke-CandidateAudit 'Invalid candidate layout' }
+            finally { Remove-Item -LiteralPath $path }
+        }
+
+        $contract = Join-Path $candidate 'worker\nx10\NxDrawingPdfExporter.Contracts.dll'
+        $oldProtocol = Join-Path $fixtureRoot 'old-protocol.dll'
+        $oldContractSource = 'using System.Reflection; [assembly: AssemblyVersion("2.1.0.0")] namespace NxDrawingPdfExporter.Contracts { public static class ProtocolVersion { public const string Current = "1"; } }'
+        Add-Type -TypeDefinition $oldContractSource -OutputAssembly $oldProtocol -OutputType Library
+        Move-Item -LiteralPath $contract -Destination $held
+        Copy-Item -LiteralPath $oldProtocol -Destination $contract
+        try { Invoke-CandidateAudit 'Incompatible Worker protocol' }
+        finally {
+            Remove-Item -LiteralPath $contract
+            Move-Item -LiteralPath $held -Destination $contract
+        }
+        Write-Host 'CANDIDATE LAYOUT AND PROTOCOL MATRIX: PASS'
+    }
+
     Write-Host 'INSPECT-RELEASE SELF TEST: PASS'
 }
 finally {
-    if (Test-Path $fixtureRoot) { Remove-Item $fixtureRoot -Recurse -Force }
+    if (Test-Path -LiteralPath $fixtureRoot) {
+        $resolvedFixture = (Resolve-Path -LiteralPath $fixtureRoot).Path
+        if (!$resolvedFixture.StartsWith($artifacts, [StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture escaped artifacts.' }
+        Remove-Item -LiteralPath $resolvedFixture -Recurse -Force
+    }
 }
