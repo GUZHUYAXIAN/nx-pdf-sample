@@ -2,16 +2,18 @@
 
 这是一个 Windows 11 x64 本地便携工具，批量读取制图 PRT，将包含实际制图视图的 Drawing Sheet 按 NX 公开 `DrawingSheets` 集合顺序导出为同名多页 PDF。
 
-## v2.1.0 源码候选
+## v2.1.0 便携版
 
 - 按源目录分组或统一输出。预检查显示实际目标文件名，可按建议升版，也可为选中项指定数字版次。
 - 手动清单、预检查、运行结果和输出目录按源目录统一着色。组色强度可单独调节，预检查与结果表可分别调整高度。
 - 执行区依次显示“导出”与“校验并保存”。每个阶段分别计算已处理数量。实色代表已处理文件，条纹代表当前正在处理的一份文件。
 - 支持简体中文和 English、五种纯色主题、四张离线角色预置图和本地图片导入。纯色和隐藏底图时下拉框显示正常，照片主题下选项行高随字体和 DPI 调整。
 
-维护者试用 r3 后确认可提交到仓库。Release 配置的 308 项自动化测试和两代 NX 各 4 个受控场景均通过。正式下载仍见下方“已发布版本”。[版本说明](docs/releases/v2.1.0.md) · [验证记录](docs/verification/adaptive-groups-phase-progress/README.md) · [人工验收清单](docs/verification/adaptive-groups-phase-progress/manual-acceptance.md)
+[Windows x64 ZIP](https://github.com/GUZHUYAXIAN/nx-pdf-sample/releases/download/v2.1.0/NX-Drawing-PDF-Exporter-v2.1.0-win-x64.zip) · [SHA-256](https://github.com/GUZHUYAXIAN/nx-pdf-sample/releases/download/v2.1.0/SHA256SUMS.txt) · [版本说明](docs/releases/v2.1.0.md)
 
-## 已发布版本
+维护者已试用 r3。308 项自动化测试和两代 NX 各 4 个受控场景通过。100%／125%／150% DPI、物理断网和其他电脑的逐项验收仍待记录。[验证记录](docs/verification/adaptive-groups-phase-progress/README.md) · [人工验收清单](docs/verification/adaptive-groups-phase-progress/manual-acceptance.md)
+
+## 支持的 NX 安装与历史版本
 
 **v2.0.1：NX 10 / NX 2506 双版本更新（2026-09-19）**。一个 .NET 10 自包含 GUI，两个独立 net48 x64 Worker；支持发现、选择、保存和切换。[下载便携版](https://github.com/GUZHUYAXIAN/nx-pdf-sample/releases/tag/v2.0.1)。已验证组件组合：
 
@@ -56,7 +58,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/publish-portable.ps1 -
 
 - 输入支持“扫描文件夹”和“手动多选 PRT”。
 - 文件夹扫描默认不递归，可主动勾选包含子文件夹。
-- 2.1.0 候选默认按 PRT 实际父目录分组。各组可独立指定目标，也可主动选择统一输出目录。
+- v2.1.0 默认按 PRT 实际父目录分组。各组可独立指定目标，也可主动选择统一输出目录。
 - 已有 PDF 支持互斥的原名跳过、原名安全覆盖和升版，默认跳过。升版从源目录与实际目标目录取最高数字版次，可手动指定。
 - 0 版保留完整基本名，正数版次追加 `-R数字`。正式目标始终采用预检查显示并冻结的版次。
 - 只有至少包含一个实际制图视图的 Drawing Sheet 才导出。

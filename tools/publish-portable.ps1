@@ -1,4 +1,4 @@
-﻿# Builds the portable release package:
+# Builds the portable release package:
 #   package\
 #     NX图纸批量导出工具.exe      (GUI, win-x64 self-contained single file)
 #     worker\                     (net48 x64 worker files, no Siemens binaries)
@@ -100,12 +100,12 @@ Copy-Item (Join-Path $repoRoot 'THIRD-PARTY-NOTICES.txt') (Join-Path $packageRoo
 @'
 NX 图纸批量导出工具（便携版）
 
-1. 双击 NX图纸批量导出工具.exe 运行；无需安装任何运行库。
+1. 双击 NX图纸批量导出工具.exe 运行。GUI 自带 .NET 运行时，Worker 使用系统的 .NET Framework 4.8 和本机 NX。
 2. 支持 Windows 11 x64、NX 10.0.0.24 与已验证 NX 2506 组件组合（NXOpen 2506.0.0.0 / UF 2506.1700.0.0 / Utilities 2506.0.0.0）。双版本无有效保存项时必须明确选择；可手动选择根目录。
 3. 选择扫描文件夹或手动多选 PRT，选择输出方式后执行预检查，再开始导出。
 4. 导出过程逐个处理文件；导出的 PDF 会先通过校验再正式发布。
 5. 本工具不联网、不修改源 PRT、不修改 NX 安装和系统配置。
-6. v2.1.0 本地候选。保留 assets/themes、en 和 worker 目录。跨 NX 版本打开旧图纸时，请核对尺寸标注。
+6. 保留 assets/themes、en 和 worker 目录。跨 NX 版本打开旧图纸时，请核对尺寸标注。
 7. 100%/125%/150% DPI 完整矩阵、物理断网及其他电脑验收未逐项完成。不得混用旧包 Worker。
 '@ | Set-Content -LiteralPath (Join-Path $packageRoot '说明.txt') -Encoding UTF8
 
@@ -122,7 +122,7 @@ try {
     [IO.File]::WriteAllLines((Join-Path $releaseRoot 'source-manifest.sha256'), $sourceLines, (New-Object Text.UTF8Encoding($false)))
     $sourceIdentity = (Get-FileHash -LiteralPath (Join-Path $releaseRoot 'source-manifest.sha256')).Hash
     $identity = if ($ReleaseVersion) { "NX Drawing PDF Exporter v$ReleaseVersion" } else { "NX Drawing PDF Exporter v$candidateVersion local candidate" }
-    @($identity, "Source commit: $head", "Tracked changes: $($trackedChanges.Count)", "Source manifest SHA256: $sourceIdentity", "Local candidate. GUI, DPI, physical offline operation, and other-machine acceptance are tracked separately.") |
+    @($identity, "Source commit: $head", "Tracked changes: $($trackedChanges.Count)", "Source manifest SHA256: $sourceIdentity", "GUI feedback, DPI, physical offline operation, and other-machine acceptance are tracked separately.") |
         Set-Content -LiteralPath (Join-Path $packageRoot 'build-info.txt') -Encoding UTF8
     & git status --short | Set-Content -LiteralPath (Join-Path $releaseRoot 'working-tree-status.txt') -Encoding UTF8
 } finally { Pop-Location }
