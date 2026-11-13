@@ -20,6 +20,7 @@ public sealed partial class MainForm
     private bool previousHighContrast;
     private AppearanceDialog? appearanceDialog;
     private WindowBackdrop? dialogBackdrop;
+    private Dictionary<string, double> groupHues = new(StringComparer.OrdinalIgnoreCase);
 
     partial void InitializeAppearance()
     {
@@ -61,6 +62,8 @@ public sealed partial class MainForm
     partial void OpenAppearance()
     {
         var before = appearance;
+        var beforeHues = groupHues;
+        groupHues = new(groupHues, StringComparer.OrdinalIgnoreCase);
         prePreviewFrame = frame;
         using var dialog = new AppearanceDialog(Ui, settings, themes, importedImages,
             (id, effects, image) => ApplyAppearance(id, effects, image),
@@ -86,6 +89,7 @@ public sealed partial class MainForm
         {
             themeRenderer?.Cancel();
             appearance = before;
+            groupHues = beforeHues;
             var restore = prePreviewFrame;
             prePreviewFrame = null;
             if (restore is not null && restore.Request.HighContrast == SystemInformation.HighContrast)
@@ -109,9 +113,17 @@ public sealed partial class MainForm
                 WarnThemeUnavailable();
             return;
         }
+        if (appearance.Theme?.Id != theme.Id || !StringComparer.OrdinalIgnoreCase.Equals(appearance.Path, path))
+            groupHues = new(StringComparer.OrdinalIgnoreCase);
         appearance = (theme, (effects ?? theme.Defaults).Normalize(), path);
         RequestThemeFrame();
     }
+
+    private GroupVisualKey[] VisibleGroupKeys() => controller.Session.Groups
+        .Concat(controller.Session.DescribeGroups(controller.ManualPaths))
+        .Select(group => new GroupVisualKey(group.Key, group.Label))
+        .Concat(runRows.Select(pair => GroupVisualKey.FromSource(pair.Key, pair.Value.Group)))
+        .DistinctBy(group => group.DirectoryKey, StringComparer.OrdinalIgnoreCase).ToArray();
 
     private void RequestThemeFrame()
     {
@@ -123,7 +135,10 @@ public sealed partial class MainForm
         var previous = frame?.Request;
         var sameAppearance = previous is not null && previous.Theme == theme && previous.Effects == effects
             && previous.ImagePath == path && previous.HighContrast == highContrast;
-        if (sameAppearance && previous!.PixelSize == size)
+        var groups = VisibleGroupKeys();
+        var sameGroups = (previous?.Groups ?? []).Select(group => group.DirectoryKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(groups.Select(group => group.DirectoryKey));
+        if (sameAppearance && sameGroups && previous!.PixelSize == size)
         {
             themeRenderer.Cancel();
             if (frame is { } current)
@@ -131,11 +146,11 @@ public sealed partial class MainForm
             return;
         }
         var request = new ThemeRenderRequest(++themeRevision, path, size, theme, effects, highContrast,
-            sameAppearance ? frame?.Palette : null);
+            sameAppearance ? frame?.Palette : null, groups, new Dictionary<string, double>(groupHues, StringComparer.OrdinalIgnoreCase));
         if (highContrast || path is null || effects.ImageVisibility == 0)
         {
             themeRenderer.Cancel();
-            AcceptFrame(new(request, null, null));
+            AcceptFrame(ThemeFrame.Render(request, default));
         }
         else
             _ = themeRenderer.Request(request);
@@ -145,6 +160,9 @@ public sealed partial class MainForm
     {
         var previous = frame;
         frame = next;
+        if (next.Materials is { } skin)
+            foreach (var pair in skin.Styles)
+                groupHues.TryAdd(pair.Key, pair.Value.Hue);
         if (!ReferenceEquals(previous, prePreviewFrame) && !ReferenceEquals(previous, next))
             previous?.Dispose();
         RefreshThemeColors();
@@ -205,7 +223,7 @@ public sealed partial class MainForm
         };
         foreach (var grid in new[] { preflight, results, manualGrid })
         {
-            grid.GroupTint = row => grid.Rows[row].Tag is GridRow data ? GroupTint(data.Group) : Color.Empty;
+            grid.Group = row => grid.Rows[row].Tag is GridRow data && data.Group.Length > 0 ? GroupVisualKey.FromSource(data.Source, data.Group) : null;
             grid.RowStatus = row => grid.Rows[row].Tag is GridRow data ? data.Role : SkinTextRole.Body;
             grid.CellMouseEnter += (_, e) =>
             {
@@ -223,7 +241,7 @@ public sealed partial class MainForm
             return;
         var palette = CurrentPalette();
         var materials = frame.Materials;
-        var sample = frame.Backdrop?.GetPixel(0, 0) ?? palette.Background;
+        var sample = frame.Backdrop?.GetPixel(0, 0) ?? palette.Surface;
         BackColor = palette.Background;
         ThemeControlStyler.Apply(shell, palette, backdrop);
         shell.BackColor = palette.Background;
@@ -245,21 +263,7 @@ public sealed partial class MainForm
                 ?? ColorContrast.Over(palette.Surface, Color.FromArgb(23, palette.Foreground));
             grid.ColumnHeadersDefaultCellStyle.ForeColor = materials?.Header.Foreground ?? palette.Foreground;
             grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = grid.ColumnHeadersDefaultCellStyle.BackColor;
-            foreach (DataGridViewRow row in grid.Rows)
-                row.DefaultCellStyle.BackColor = materials is null && row.Tag is GridRow data ? GroupColor(data.Group) : Color.Empty;
             grid.RefreshSkin();
-        }
-        if (materials is null)
-        {
-            foreach (Control row in outputRows.Controls)
-                if (row.Tag is SourceDirectoryGroup group)
-                {
-                    var color = GroupColor(group.Label);
-                    row.BackColor = color.IsEmpty ? palette.Surface : color;
-                    foreach (Control child in row.Controls)
-                        if (child is Label)
-                            child.BackColor = row.BackColor;
-                }
         }
         if (appearanceDialog is { IsDisposed: false } dialog)
             ThemeControlStyler.Apply(dialog, palette, dialogBackdrop);
@@ -308,9 +312,4 @@ public sealed partial class MainForm
         ShowSkinDialog(notice, owner);
     }
 
-    partial void CustomizeGroupColor(ref Color color)
-    {
-        if (frame?.Request.Theme is { IsDark: true } theme)
-            color = ColorContrast.Over(theme.Surface, Color.FromArgb(41, color));
-    }
 }

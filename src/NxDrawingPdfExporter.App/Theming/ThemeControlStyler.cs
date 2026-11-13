@@ -47,7 +47,7 @@ internal static class ThemeControlStyler
             {
                 control.BackColor = Color.Transparent;
                 if (control.Parent is SkinSurface parent && materials is not null)
-                    control.ForeColor = (parent.Header ? materials.Header : materials.Row(parent.GroupTint, SkinRowState.Normal)).Foreground;
+                    control.ForeColor = (parent.Header ? materials.Header : materials.Row(parent.Group, SkinRowState.Normal)).Foreground;
                 else if (control.Parent is SkinFlowPanel && materials is not null)
                     control.ForeColor = materials.Header.Foreground;
             }
@@ -104,7 +104,7 @@ internal sealed class SkinMenuRenderer(ThemeDefinition palette, IBackdropSource?
         }
         if (!e.Item.Selected && !e.Item.Pressed)
             return;
-        var material = materials.Row(Color.Empty, SkinRowState.Selected);
+        var material = materials.Row(null, SkinRowState.Selected);
         var bounds = new Rectangle(Point.Empty, e.Item.Size);
         if (e.ToolStrip is MenuStrip)
         {
@@ -124,7 +124,7 @@ internal sealed class SkinMenuRenderer(ThemeDefinition palette, IBackdropSource?
     {
         if (backdrop?.Frame?.Materials is { } materials)
             e.TextColor = e.Item.Selected || e.Item.Pressed
-                ? materials.Row(Color.Empty, SkinRowState.Selected).Foreground : materials.Header.Foreground;
+                ? materials.Row(null, SkinRowState.Selected).Foreground : materials.Header.Foreground;
         base.OnRenderItemText(e);
     }
 

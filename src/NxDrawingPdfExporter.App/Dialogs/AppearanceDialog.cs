@@ -7,7 +7,7 @@ namespace NxDrawingPdfExporter.App.Dialogs;
 
 internal sealed class AppearanceDialog : SkinDialog
 {
-    private static readonly string[] ParameterKeys = ["ImageVisibility", "PanelOpacity", "Zoom", "OffsetX", "OffsetY", "Blur", "Mist", "Gradient"];
+    private static readonly string[] ParameterKeys = ["ImageVisibility", "PanelOpacity", "Zoom", "OffsetX", "OffsetY", "Blur", "Mist", "Gradient", "GroupColorStrength"];
     private readonly UiText ui;
     private readonly IReadOnlyList<ThemeDefinition> themes;
     private readonly ImportedImageStore imported;
@@ -91,14 +91,14 @@ internal sealed class AppearanceDialog : SkinDialog
             return slider;
         }).ToArray();
 
-        AddChoice(direction, "GradientDirection", ["GradientLeftRight", "GradientRightLeft", "GradientTopBottom", "GradientBottomTop"], 8);
-        AddChoice(surface, "SurfaceMode", ["SurfaceDark", "SurfaceLight"], 9);
+        AddChoice(direction, "GradientDirection", ["GradientLeftRight", "GradientRightLeft", "GradientTopBottom", "GradientBottomTop"], 9);
+        AddChoice(surface, "SurfaceMode", ["SurfaceDark", "SurfaceLight"], 10);
         automatic.Text = ui.Get("AutomaticTextColor");
         automatic.CheckedChanged += (_, _) => SaveDraft();
         manualColor.Text = ui.Get("ManualTextColor");
         manualColor.Click += (_, _) => ChooseColor();
-        effects.Controls.Add(automatic, 0, 10);
-        effects.Controls.Add(manualColor, 1, 10);
+        effects.Controls.Add(automatic, 0, 11);
+        effects.Controls.Add(manualColor, 1, 11);
         var viewport = new SkinWorkspaceViewport { Dock = DockStyle.Fill, AutoScroll = true };
         viewport.Controls.Add(effects);
         layout.Controls.Add(viewport, 1, 1);
@@ -141,7 +141,7 @@ internal sealed class AppearanceDialog : SkinDialog
         var parameter = settings.Get(Theme);
         updating = true;
         int[] current = [parameter.ImageVisibility, parameter.PanelOpacity, parameter.Zoom, parameter.OffsetX, parameter.OffsetY,
-            parameter.Blur, parameter.MistOpacity, parameter.GradientStrength];
+            parameter.Blur, parameter.MistOpacity, parameter.GradientStrength, parameter.GroupColorStrength];
         var available = ImagePath is not null && Theme.HasAssets;
         for (var index = 0; index < sliders.Length; index++)
         {
@@ -197,7 +197,7 @@ internal sealed class AppearanceDialog : SkinDialog
             sliders[2].Value, sliders[3].Value, sliders[4].Value, sliders[1].Value,
             (SurfaceMode)surface.SelectedIndex, automatic.Checked,
             automatic.Checked ? previous.ManualTextColorArgb : previous.ManualTextColorArgb ?? analyzedColor?.ToArgb(),
-            (SkinGradientDirection)direction.SelectedIndex);
+            (SkinGradientDirection)direction.SelectedIndex, sliders[8].Value);
         settings.Set(Theme.Id, parameter);
         SetColorCaption(parameter);
         Preview();

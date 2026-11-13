@@ -34,61 +34,72 @@ internal readonly record struct SkinMaterial(SurfaceContrastResult Contrast, IRe
 
 internal sealed class SkinMaterials
 {
-    internal static readonly Color[] GroupColors =
-    [
-        Color.FromArgb(229, 240, 252), Color.FromArgb(230, 244, 233), Color.FromArgb(249, 235, 225),
-        Color.FromArgb(239, 231, 250), Color.FromArgb(251, 242, 215), Color.FromArgb(243, 231, 239)
-    ];
-    private readonly SkinMaterial[,] rows = new SkinMaterial[GroupColors.Length + 1, 3];
-    private readonly SkinMaterial[] status = new SkinMaterial[3];
+    private readonly Dictionary<string, SkinMaterial[]> groups = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SkinMaterial[] neutral;
+    private readonly SkinMaterial[] status;
 
     internal SkinMaterials(IReadOnlyList<ColorBounds> bounds, TextPalette palette, ThemeDefinition theme,
-        ThemeParameters effects, CancellationToken token)
+        ThemeParameters effects, CancellationToken token, IReadOnlyDictionary<string, GroupStyle>? styles = null,
+        bool solid = false)
     {
         Palette = palette;
+        Styles = styles ?? new Dictionary<string, GroupStyle>();
         var dark = effects.SurfaceMode == SurfaceMode.Dark;
-        var preferred = ColorContrast.Over(dark ? Color.FromArgb(12, 18, 29) : Color.White,
+        var preferred = solid ? theme.Surface : ColorContrast.Over(dark ? Color.FromArgb(12, 18, 29) : Color.White,
             Color.FromArgb(dark ? 18 : 35, theme.Accent));
+
         SkinMaterial Make(Color text, int opacity, Color[] tints, double desired = 7)
         {
             token.ThrowIfCancellationRequested();
-            var resolved = SurfaceContrastResolver.Resolve(bounds, text, preferred, opacity, tints, desired);
-            while (resolved.Foreground.ToArgb() != text.ToArgb() && tints.Any(tint => tint.A > 0))
+            var result = SurfaceContrastResolver.Resolve(bounds, text, preferred, opacity, tints, desired);
+            if (result.Foreground.ToArgb() != text.ToArgb() && tints.Length > 0)
             {
-                tints = tints.Select(tint => Color.FromArgb(tint.A / 2, tint)).ToArray();
-                resolved = SurfaceContrastResolver.Resolve(bounds, text, preferred, opacity, tints, desired) with { Protected = true };
+                var darkMaterial = ColorContrast.Ratio(text, Color.Black) >= ColorContrast.Ratio(text, Color.White);
+                // Extreme manual text colors need a narrower luminance range. Keep the
+                // group tint's alpha and hue, moving the tint toward the protective material.
+                for (var protection = 32; protection < 256; protection += 32)
+                {
+                    var adjusted = tints.Select(tint => Color.FromArgb(tint.A, ColorContrast.Over(tint,
+                        Color.FromArgb(protection, darkMaterial ? Color.Black : Color.White)))).ToArray();
+                    var guarded = SurfaceContrastResolver.Resolve(bounds, text, preferred, opacity, adjusted, desired);
+                    if (guarded.Foreground.ToArgb() == text.ToArgb())
+                        return new(guarded with { Protected = true }, adjusted);
+                }
             }
-            return new(resolved, tints);
+            return new(result, tints);
         }
 
-        var requested = effects.PanelOpacity;
-        Header = Make(palette.Secondary, Math.Min(100, requested + 12), [], 7);
-        Editor = Make(palette.Body, Math.Min(100, requested + 18), []);
-        for (var group = 0; group <= GroupColors.Length; group++)
+        var requested = solid ? 100 : effects.PanelOpacity;
+
+        SkinMaterial[] MakeRows(Color? tint)
         {
-            var groupLayers = group == 0 ? Array.Empty<Color>() : new[] { Color.FromArgb(29, GroupColors[group - 1]) };
-            rows[group, 0] = Make(palette.Body, requested, groupLayers);
-            rows[group, 1] = Make(palette.Body, requested, [.. groupLayers, Color.FromArgb(24, theme.Accent)]);
-            rows[group, 2] = Make(palette.Selected, requested, [.. groupLayers, Color.FromArgb(66, theme.Accent)]);
+            Color[] layers = tint is { A: > 0 } color ? [color] : [];
+            return [
+                Make(palette.Body, requested, layers),
+                Make(palette.Body, requested, [.. layers, Color.FromArgb(15, theme.Accent)]),
+                Make(palette.Selected, requested, [.. layers, Color.FromArgb(35, theme.Accent)])
+            ];
         }
-        status[0] = Make(palette.Success, requested, []);
-        status[1] = Make(palette.Warning, requested, []);
-        status[2] = Make(palette.Error, requested, []);
+
+        Header = Make(palette.Secondary, Math.Min(100, requested + 12), []);
+        Editor = Make(palette.Body, Math.Min(100, requested + 18), []);
+        neutral = MakeRows(null);
+        foreach (var pair in Styles)
+            groups.Add(pair.Key, MakeRows(pair.Value.Layer));
+        status = [Make(palette.Success, requested, []), Make(palette.Warning, requested, []), Make(palette.Error, requested, [])];
         Protected = Header.Contrast.Protected || Editor.Contrast.Protected
-            || rows.Cast<SkinMaterial>().Concat(status).Any(material => material.Contrast.Protected);
+            || neutral.Concat(groups.Values.SelectMany(row => row)).Concat(status).Any(material => material.Contrast.Protected);
     }
 
     internal TextPalette Palette { get; }
+    internal IReadOnlyDictionary<string, GroupStyle> Styles { get; }
     internal SkinMaterial Header { get; }
     internal SkinMaterial Editor { get; }
-    internal SkinMaterial Body => rows[0, 0];
+    internal SkinMaterial Body => neutral[0];
     internal bool Protected { get; }
 
-    internal SkinMaterial Row(Color group, SkinRowState state)
-    {
-        var index = group.IsEmpty ? -1 : Array.FindIndex(GroupColors, color => color.ToArgb() == group.ToArgb());
-        return rows[index + 1, (int)state];
-    }
+    internal SkinMaterial Row(GroupVisualKey? group, SkinRowState state) =>
+        (group is not null && groups.TryGetValue(group.DirectoryKey, out var rows) ? rows : neutral)[(int)state];
 
     internal SkinMaterial Status(SkinTextRole role) => status[(int)role - (int)SkinTextRole.Success];
 }

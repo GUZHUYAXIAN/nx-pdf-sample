@@ -9,12 +9,12 @@ public enum SkinGradientDirection { LeftToRight, RightToLeft, TopToBottom, Botto
 public sealed record ThemeParameters(int ImageVisibility = 68, int Blur = 0, int MistOpacity = 20,
     int GradientStrength = 25, int Zoom = 0, int OffsetX = 50, int OffsetY = 50,
     int PanelOpacity = 30, SurfaceMode SurfaceMode = SurfaceMode.Dark, bool AutomaticTextColor = true,
-    int? ManualTextColorArgb = null, SkinGradientDirection GradientDirection = SkinGradientDirection.LeftToRight)
+    int? ManualTextColorArgb = null, SkinGradientDirection GradientDirection = SkinGradientDirection.LeftToRight, int GroupColorStrength = 65)
 {
     public ThemeParameters Normalize() => new(Clamp(ImageVisibility), Clamp(Blur), Clamp(MistOpacity),
         Clamp(GradientStrength), Clamp(Zoom), Clamp(OffsetX), Clamp(OffsetY), Clamp(PanelOpacity),
         Enum.IsDefined(SurfaceMode) ? SurfaceMode : SurfaceMode.Dark, AutomaticTextColor, ManualTextColorArgb,
-        Enum.IsDefined(GradientDirection) ? GradientDirection : SkinGradientDirection.LeftToRight);
+        Enum.IsDefined(GradientDirection) ? GradientDirection : SkinGradientDirection.LeftToRight, Clamp(GroupColorStrength));
 
     private static int Clamp(int value) => Math.Clamp(value, 0, 100);
 }

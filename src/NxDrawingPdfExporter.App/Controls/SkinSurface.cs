@@ -5,12 +5,12 @@ namespace NxDrawingPdfExporter.App.Controls;
 internal class SkinSurface : TableLayoutPanel
 {
     internal IBackdropSource? Backdrop;
-    internal Color GroupTint;
+    internal GroupVisualKey? Group;
     internal bool Header;
 
     protected override void OnPaintBackground(PaintEventArgs e)
     {
-        if (!SkinPainter.PaintSurface(this, Backdrop, e.Graphics, e.ClipRectangle, GroupTint, Header))
+        if (!SkinPainter.PaintSurface(this, Backdrop, e.Graphics, e.ClipRectangle, Group, Header))
             base.OnPaintBackground(e);
     }
 }
@@ -54,7 +54,7 @@ internal sealed class SkinWorkspaceViewport : Panel
 internal static class SkinPainter
 {
     internal static bool PaintSurface(Control control, IBackdropSource? source, Graphics graphics, Rectangle clip,
-        Color group = default, bool header = false)
+        GroupVisualKey? group = null, bool header = false)
     {
         if (source?.Frame?.Materials is not { } materials)
             return false;

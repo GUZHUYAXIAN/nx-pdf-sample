@@ -10,7 +10,7 @@ internal sealed class SkinDataGridView : WorkspaceGrid
     private int hoverRow = -1;
 
     internal IBackdropSource? BackdropSource;
-    internal Func<int, Color>? GroupTint;
+    internal Func<int, GroupVisualKey?>? Group;
     internal Func<int, SkinTextRole>? RowStatus;
 
     public SkinDataGridView()
@@ -72,7 +72,7 @@ internal sealed class SkinDataGridView : WorkspaceGrid
         var origin = BackdropSource.Origin(this);
         var selected = (e.State & DataGridViewElementStates.Selected) != 0 && e.RowIndex >= 0;
         var state = selected ? SkinRowState.Selected : e.RowIndex == hoverRow ? SkinRowState.Hovered : SkinRowState.Normal;
-        var material = e.RowIndex < 0 ? materials.Header : materials.Row(GroupTint?.Invoke(e.RowIndex) ?? Color.Empty, state);
+        var material = e.RowIndex < 0 ? materials.Header : materials.Row(Group?.Invoke(e.RowIndex), state);
         var cell = e.CellBounds;
         var paint = canvas.Save();
         try
@@ -87,9 +87,18 @@ internal sealed class SkinDataGridView : WorkspaceGrid
             if (selected && e.ColumnIndex == 0)
                 canvas.DrawLine(separator, cell.Left + 2, cell.Top + 2, cell.Left + 2, cell.Bottom - 3);
 
+            var group = e.RowIndex >= 0 && Columns[e.ColumnIndex].Name == "Group" ? Group?.Invoke(e.RowIndex) : null;
             var isEditing = IsCurrentCellInEditMode && CurrentCellAddress == new Point(e.ColumnIndex, e.RowIndex);
             var text = Convert.ToString(e.FormattedValue) ?? "";
-            if (!isEditing && text.Length > 0)
+            if (group is not null && materials.Styles.TryGetValue(group.DirectoryKey, out var style))
+            {
+                var badge = Rectangle.Inflate(cell, -8, -5);
+                using var ink = new SolidBrush(style.Marker);
+                canvas.FillRectangle(ink, badge);
+                TextRenderer.DrawText(canvas, group.Label, cellStyle.Font ?? Font, badge, style.MarkerText,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.PreserveGraphicsClipping);
+            }
+            else if (!isEditing && text.Length > 0)
             {
                 var inset = cellStyle.Padding;
                 var textBounds = Rectangle.FromLTRB(cell.Left + inset.Left + 2, cell.Top + inset.Top,

@@ -195,4 +195,5 @@
   <data name="ChooseSkinImage" xml:space="preserve"><value>Import a PNG or JPEG to continue.</value></data>
   <data name="PreviewPending" xml:space="preserve"><value>Rendering preview locally…</value></data>
   <data name="ContrastProtection" xml:space="preserve"><value>Some surfaces use stronger shading to keep text readable. The sliders retain your settings.</value></data>
+  <data name="GroupColorStrength" xml:space="preserve"><value>Group color strength</value></data>
 </root>

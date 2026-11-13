@@ -55,8 +55,10 @@ public sealed class SkinPreviewSettingsTests
         var theme = ThemeCatalog.Load(AppContext.BaseDirectory)[0];
         var analysis = new PaletteAnalysis([Color.Black, Color.White], 0, 1, backgrounds);
         var palette = SurfaceContrastResolver.Choose(analysis, effects);
-        var materials = new SkinMaterials(backgrounds, palette, theme, effects, default);
-        foreach (var group in SkinMaterials.GroupColors)
+        var groups = GroupPaletteTests.Groups(6);
+        var styles = GroupPaletteResolver.Resolve(analysis, theme, effects, groups, new Dictionary<string, double>());
+        var materials = new SkinMaterials(backgrounds, palette, theme, effects, default, styles);
+        foreach (var group in groups)
             foreach (var state in Enum.GetValues<SkinRowState>())
             {
                 var row = materials.Row(group, state);

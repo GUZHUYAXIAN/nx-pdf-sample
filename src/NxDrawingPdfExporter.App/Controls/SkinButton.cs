@@ -8,7 +8,7 @@ internal sealed class SkinButton : Button
 
     protected override void OnPaint(PaintEventArgs e)
     {
-        if (Backdrop?.Frame?.Materials is not { } materials)
+        if (Backdrop?.Frame is not { Backdrop: not null, Materials: { } materials })
         {
             base.OnPaint(e);
             return;
@@ -16,7 +16,7 @@ internal sealed class SkinButton : Button
         var inside = Enabled && ClientRectangle.Contains(PointToClient(Cursor.Position));
         var state = inside && Capture ? SkinRowState.Selected :
             inside ? SkinRowState.Hovered : Enabled && Equals(Tag, "Primary") ? SkinRowState.Selected : SkinRowState.Normal;
-        var material = state == SkinRowState.Normal ? materials.Header : materials.Row(Color.Empty, state);
+        var material = state == SkinRowState.Normal ? materials.Header : materials.Row(null, state);
         SkinPainter.Paint(this, Backdrop, e.Graphics, ClientRectangle, material);
         using var border = new Pen(Color.FromArgb(!Enabled ? 46 : Equals(Tag, "Primary") ? 170 : 92, material.Foreground));
         var bounds = Rectangle.Inflate(ClientRectangle, -1, -1);
@@ -38,14 +38,14 @@ internal sealed class SkinComboBox : ComboBox
 
     protected override void OnDrawItem(DrawItemEventArgs e)
     {
-        if (Backdrop?.Frame?.Materials is not { } materials)
+        if (Backdrop?.Frame is not { Backdrop: not null, Materials: { } materials })
         {
             base.OnDrawItem(e);
             return;
         }
         var edit = (e.State & DrawItemState.ComboBoxEdit) != 0;
         var selected = (e.State & DrawItemState.Selected) != 0;
-        var material = selected ? materials.Row(Color.Empty, SkinRowState.Selected) : materials.Editor;
+        var material = selected ? materials.Row(null, SkinRowState.Selected) : materials.Editor;
         if (edit)
             SkinPainter.Paint(this, Backdrop, e.Graphics, e.Bounds, material);
         else

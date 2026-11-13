@@ -144,13 +144,14 @@ public sealed partial class MainForm
         }
         outputRows.ResumeLayout();
         RefreshThemeColors();
+        RequestThemeFrame();
     }
 
     private void AddOutputRow(SourceDirectoryGroup? group, string current)
     {
         var row = new SkinSurface { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 4,
             Margin = new Padding(1, 2, 1, 2), Padding = new Padding(4), Tag = group,
-            GroupTint = group is null ? Color.Empty : GroupTint(group.Label) };
+            Group = group is null ? null : new GroupVisualKey(group.Key, group.Label) };
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, (group is null ? 135 : 175) * DeviceDpi / 96));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -216,6 +217,7 @@ public sealed partial class MainForm
         runRows = controller.Session.CurrentPlan?.Items.ToDictionary(item => item.SourcePath,
             item => (item.SourceOrdinal, GroupLabel(item.GroupKey)), StringComparer.OrdinalIgnoreCase)
             ?? new Dictionary<string, (int, string)>();
+        RequestThemeFrame();
         try
         {
             await controller.RunAsync();
@@ -408,7 +410,6 @@ public sealed partial class MainForm
                 }
                 if (cursor?.Source == data.Source)
                     rowIndex = row.Index;
-                row.DefaultCellStyle.BackColor = GroupColor(data.Group);
             }
             if (rowIndex >= 0 && grid.Columns[column].Visible)
                 grid.CurrentCell = grid[column, rowIndex];
@@ -507,23 +508,5 @@ public sealed partial class MainForm
             OpenFolder(path);
     }
 
-    private static Color GroupTint(string label)
-    {
-        if (label.Length == 0 || SystemInformation.HighContrast)
-            return Color.Empty;
-        var palette = SkinMaterials.GroupColors;
-        var index = label.Aggregate(0, (acc, c) => (acc * 26 + c - 'A' + 1) % palette.Length);
-        return palette[(index + palette.Length - 1) % palette.Length];
-    }
-
-    private Color GroupColor(string label)
-    {
-        var color = GroupTint(label);
-        if (!color.IsEmpty)
-            CustomizeGroupColor(ref color);
-        return color;
-    }
-
-    partial void CustomizeGroupColor(ref Color color);
     partial void RefreshThemeColors();
 }

@@ -195,4 +195,5 @@
   <data name="ChooseSkinImage" xml:space="preserve"><value>请先导入一张 PNG 或 JPEG。</value></data>
   <data name="PreviewPending" xml:space="preserve"><value>正在本地更新预览…</value></data>
   <data name="ContrastProtection" xml:space="preserve"><value>已增强部分区域的遮罩以保持文字清晰。滑杆仍显示你的设定值。</value></data>
+  <data name="GroupColorStrength" xml:space="preserve"><value>分组颜色强度</value></data>
 </root>

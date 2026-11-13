@@ -81,7 +81,8 @@ public sealed class JsonUiSettingsStore(string settingsPath)
                 Field(value, "zoom", defaults.Zoom), Field(value, "offsetX", defaults.OffsetX), Field(value, "offsetY", defaults.OffsetY),
                 Field(value, "panelOpacity", defaults.PanelOpacity), Field(value, "surfaceMode", defaults.SurfaceMode),
                 Field(value, "automaticTextColor", defaults.AutomaticTextColor), Field<int?>(value, "manualTextColorArgb", null),
-                Field(value, "gradientDirection", defaults.GradientDirection));
+                Field(value, "gradientDirection", defaults.GradientDirection),
+                Field(value, "groupColorStrength", defaults.GroupColorStrength));
         }
 
         var heights = new WorkspaceHeights();

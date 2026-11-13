@@ -55,11 +55,14 @@ public sealed class SkinPaintingTests
         var pixels = ImagePaletteAnalyzer.Analyze(picture);
         var effects = new ThemeParameters(PanelOpacity: 9);
         var palette = SurfaceContrastResolver.Choose(pixels, effects);
-        var skin = new SkinMaterials(pixels.Bounds, palette, ThemeCatalog.Load(AppContext.BaseDirectory)[0], effects, default);
+        var theme = ThemeCatalog.Load(AppContext.BaseDirectory)[0];
+        var groups = GroupPaletteTests.Groups(3);
+        var styles = GroupPaletteResolver.Resolve(pixels, theme, effects, groups, new Dictionary<string, double>());
+        var skin = new SkinMaterials(pixels.Bounds, palette, theme, effects, default, styles);
         var surfaces = new[]
         {
-            skin.Row(SkinMaterials.GroupColors[2], SkinRowState.Selected),
-            skin.Row(SkinMaterials.GroupColors[2], SkinRowState.Hovered),
+            skin.Row(groups[2], SkinRowState.Selected),
+            skin.Row(groups[2], SkinRowState.Hovered),
             skin.Editor, skin.Status(SkinTextRole.Error)
         };
         foreach (var surface in surfaces)
