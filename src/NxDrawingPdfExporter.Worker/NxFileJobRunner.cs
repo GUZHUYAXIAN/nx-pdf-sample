@@ -20,7 +20,8 @@ namespace NxDrawingPdfExporter.Worker
         private static readonly SheetSelectionService SelectionService = new SheetSelectionService();
         private readonly SourceFileGuard sourceFileGuard = new SourceFileGuard();
 
-        public ExportReport ExportSingle(string sourcePath, string tempPdfPath, out SheetNameMap? nameMap)
+        public ExportReport ExportSingle(string sourcePath, string tempPdfPath, out SheetNameMap? nameMap,
+            Action<WorkerProgressStage>? reportStep = null)
         {
             nameMap = null;
             var stopwatch = Stopwatch.StartNew();
@@ -29,6 +30,7 @@ namespace NxDrawingPdfExporter.Worker
             PartLoadStatus? loadStatus = null;
             try
             {
+                reportStep?.Invoke(WorkerProgressStage.Opening);
                 var session = Session.GetSession();
                 try { openedPart = session.Parts.OpenDisplay(before.FullPath, out loadStatus); }
                 catch (NXException error)
@@ -50,6 +52,7 @@ namespace NxDrawingPdfExporter.Worker
                         "模型依赖未完全加载，已按失败处理。",
                         reasonCode: ResultReasons.MissingModel, technicalDetails: string.Join(Environment.NewLine, loadDiagnostics));
                 }
+                reportStep?.Invoke(WorkerProgressStage.Inspecting);
                 var salt = SheetNameTokenizer.NewSalt();
                 var nativeSheets = new List<DrawingSheet>();
                 foreach (DrawingSheet sheet in workPart.DrawingSheets)
@@ -102,6 +105,7 @@ namespace NxDrawingPdfExporter.Worker
                 // a skipped or blank page. Exceptions propagate to Program.
                 try
                 {
+                    reportStep?.Invoke(WorkerProgressStage.Updating);
                     new NxViewUpdater().UpdateForExport(workPart, selectedSheets);
                 }
                 catch (Exception error)
@@ -109,6 +113,7 @@ namespace NxDrawingPdfExporter.Worker
                     return ExportReport.Failed("制图视图更新失败。", reasonCode: ResultReasons.ViewUpdateFailed,
                         technicalDetails: error.ToString());
                 }
+                reportStep?.Invoke(WorkerProgressStage.GeneratingPdf);
                 new NxPdfExporter().Export(workPart, selectedSheets, Path.GetFullPath(tempPdfPath));
 
                 if (sourceFileGuard.HasChanged(before))
@@ -148,6 +153,7 @@ namespace NxDrawingPdfExporter.Worker
                 loadStatus?.Dispose();
                 if (openedPart != null)
                 {
+                    reportStep?.Invoke(WorkerProgressStage.Closing);
                     new NxPartCloser().CloseWithoutSaving(openedPart);
                 }
                 if (sourceFileGuard.HasChanged(before))

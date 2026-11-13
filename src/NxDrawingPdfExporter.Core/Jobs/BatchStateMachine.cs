@@ -50,7 +50,8 @@ namespace NxDrawingPdfExporter.Core.Jobs
         }
 
         /// <summary>snapshot 在每个文件状态落定后被调用，用于原子重写 result.json。</summary>
-        public JobResult Run(JobRequest request, IReadOnlyList<BatchItemPreflight>? preflight = null, Action<JobResult>? snapshot = null)
+        public JobResult Run(JobRequest request, IReadOnlyList<BatchItemPreflight>? preflight = null, Action<JobResult>? snapshot = null,
+            Action<BatchItemProgress>? observer = null)
         {
             if (request is null)
             {
@@ -83,6 +84,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
                     break;
                 }
 
+                observer?.Invoke(new BatchItemProgress(index, null));
                 if (preflight is not null && index < preflight.Count && preflight[index].NameConflict)
                 {
                     files.Add(new FileResult
@@ -112,6 +114,7 @@ namespace NxDrawingPdfExporter.Core.Jobs
 
                 result.Files = files.ToArray();
                 snapshot?.Invoke(result);
+                observer?.Invoke(new BatchItemProgress(index, files[files.Count - 1]));
             }
 
             result.Files = files.ToArray();

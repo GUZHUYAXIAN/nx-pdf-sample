@@ -62,10 +62,12 @@ namespace NxDrawingPdfExporter.Worker
                 return UsageError;
             }
 
+            var progress = new WorkerProgressReporter(request, jobPath);
+            progress.Step(WorkerProgressStage.Initializing);
             JobResult result;
             try
             {
-                result = new NxBatchRunner().Run(request);
+                result = new NxBatchRunner(progress).Run(request);
             }
             catch (Exception error)
             {
@@ -82,9 +84,11 @@ namespace NxDrawingPdfExporter.Worker
             catch (Exception error)
             {
                 Console.Error.WriteLine("结果写入失败: " + Sanitize(error.Message));
+                progress.Finish(faulted: true);
                 return ReportWriteFailure;
             }
 
+            progress.Finish(result.FatalError is not null);
             var summary = ResultSummary.From(result.Files);
             Console.WriteLine(summary.ToChineseSummary());
             return result.Files.Any(f => f.Status == FileResultStatus.Failed) || result.FatalError != null
