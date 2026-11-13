@@ -78,6 +78,8 @@ internal static class Program
             }
         }
 
+        var timeline = new System.Collections.Concurrent.ConcurrentQueue<NxDrawingPdfExporter.App.Progress.RunProgressState>();
+        controller.ProgressChanged += () => timeline.Enqueue(controller.Progress);
         var runTask = controller.RunAsync();
         if (string.Equals(args[0], "cancel", StringComparison.Ordinal))
         {
@@ -118,6 +120,7 @@ internal static class Program
             discovered = discovered.Select(i => new { i.Profile.Label, i.RootDirectory, i.DetectedVersion, i.UfVersion, i.UtilitiesVersion, i.Sources }),
             selected = controller.SelectedNx,
             runDirectory = controller.CurrentRunDirectory,
+            phaseTimeline = timeline.ToArray(),
             results = controller.Results.Select(r => new
             {
                 source = r.SourcePath,

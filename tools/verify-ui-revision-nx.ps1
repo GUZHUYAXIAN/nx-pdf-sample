@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory=$true)][string]$Model,
     [Parameter(Mandatory=$true)][string]$ReferencePdf,
     [Parameter(Mandatory=$true)][string]$EvidenceRoot,
-    [string]$PackageRoot
+    [string]$PackageRoot,
+    [switch]$RequireProgress
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -84,6 +85,25 @@ function Invoke-Scenario($profile, $name, [string[]]$copies, [string]$mode, [str
         throw "Unexpected Worker or publication result. Evidence: $folder"
     }
 
+    if ($RequireProgress) {
+        $snapshotPath = Join-Path $hostResult.runDirectory 'progress.json'
+        $snapshot = Get-Content -LiteralPath $snapshotPath -Raw | ConvertFrom-Json
+        $timeline = @($hostResult.phaseTimeline)
+        $exports = @($timeline | Where-Object { $_.Phase -eq 3 -and $null -ne $_.CurrentItemIndex })
+        $cumulative = @($timeline | Where-Object { $_.Phase -eq 3 -and $_.Step -ne 9 -and $_.Export.Processed -gt 0 -and $_.Export.Processed -lt $_.Export.Total })
+        $saving = @($timeline | Where-Object Phase -eq 5)
+        $savedExpected = @($statuses | Where-Object { $_ -in @('Success','Overwritten') }).Count
+        if (!$snapshot -or $snapshot.SchemaVersion -ne 1 -or $snapshot.Stage -ne 9 -or
+            $snapshot.Total -ne $inputs.Count -or $snapshot.Processed -ne $savedExpected -or
+            $snapshot.Generated -ne $savedExpected -or $saving.Count -eq 0 -or
+            $saving[0].Publication.Total -ne $savedExpected -or $saving[0].Publication.Processed -ne 0 -or
+            $saving[-1].Publication.Saved -ne $savedExpected) {
+            throw "Unexpected phase counters or terminal progress snapshot. Evidence: $folder"
+        }
+        if ($name -eq 'zero-grouped' -and ($exports.Count -eq 0 -or $cumulative.Count -eq 0)) {
+            throw "Missing live active-file or cumulative Worker progress. Evidence: $folder"
+        }
+    }
     $records = @()
     $index = 0
     foreach ($item in @($hostResult.results | Where-Object status -In @('Success','Overwritten'))) {

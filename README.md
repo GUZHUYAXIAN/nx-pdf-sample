@@ -2,9 +2,13 @@
 
 这是一个 Windows 11 x64 本地便携工具，批量读取制图 PRT，将包含实际制图视图的 Drawing Sheet 按 NX 公开 `DrawingSheets` 集合顺序导出为同名多页 PDF。
 
-## 2.1.0 整体滚动与融合皮肤候选
+## 2.1.0 分组色与分阶段进度候选
 
-本轮候选将设置、预检查与结果排列在同一个主体滚动区，预检查和结果可独立调高。角色皮肤和导入图共用窗口底图，字色和可读性遮罩在本地计算。验收范围与操作见 [本轮验证记录](docs/verification/scroll-immersive-skins/README.md)。
+手动清单、预检查、运行结果和输出目录按源目录统一着色。外观设置可独立调整组色强度。执行区先显示 Worker 的导出进度，再显示临时 PDF 的校验并保存进度。构建、双 NX 验证及待验操作见 [本轮验证记录](docs/verification/adaptive-groups-phase-progress/README.md)。
+
+## 前一轮 2.1.0 整体滚动与融合皮肤候选
+
+本轮候选将设置、预检查与结果排列在同一个主体滚动区，预检查和结果可独立调高。角色皮肤和导入图共用窗口底图，字色和可读性遮罩在本地计算。验收范围与操作见 [整体滚动与融合皮肤验证记录](docs/verification/scroll-immersive-skins/README.md)。
 
 ## 上轮 2.1.0 本地候选
 
