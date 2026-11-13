@@ -139,6 +139,7 @@
   <data name="Reason.WorkerResultInvalid" xml:space="preserve"><value>The Worker result is missing or does not match this run.</value></data>
   <data name="NxChanged" xml:space="preserve"><value>The selected NX installation changed. Confirm the detected installation and try again.</value></data>
   <data name="Preparing" xml:space="preserve"><value>Preparing export…</value></data>
+  <data name="CancelDeliveryFailed" xml:space="preserve"><value>The cancellation marker could not be written. The current task continues. You can retry cancellation.</value></data>
   <data name="Stopping" xml:space="preserve"><value>Cancellation requested. Waiting for the current file.</value></data>
   <data name="NxRequired" xml:space="preserve"><value>A validated NX 10 or NX 2506 installation is required.</value></data>
   <data name="NoInput" xml:space="preserve"><value>No candidate PRT files were found.</value></data>
@@ -196,4 +197,29 @@
   <data name="PreviewPending" xml:space="preserve"><value>Rendering preview locally…</value></data>
   <data name="ContrastProtection" xml:space="preserve"><value>Some surfaces use stronger shading to keep text readable. The sliders retain your settings.</value></data>
   <data name="GroupColorStrength" xml:space="preserve"><value>Group color strength</value></data>
+  <data name="PhaseExport" xml:space="preserve"><value>Phase 1/2 · Export</value></data>
+  <data name="PhaseSave" xml:space="preserve"><value>Phase 2/2 · Validate and save</value></data>
+  <data name="PhaseExportCounts" xml:space="preserve"><value>Processed {0}/{1} ({2}%) · Generated {3} · Preflight skips {4}</value></data>
+  <data name="PhaseSaveCounts" xml:space="preserve"><value>Processed {0}/{1} ({2}%) · Saved {3} ({4} replaced) · Failed {5}</value></data>
+  <data name="PhaseNoExport" xml:space="preserve"><value>0 to export · Preflight skips {0}</value></data>
+  <data name="PhaseNoSave" xml:space="preserve"><value>No generated files to validate and save</value></data>
+  <data name="PhaseCurrent" xml:space="preserve"><value>File {0}/{1} · {2} · {3}</value></data>
+  <data name="PhaseFeedback" xml:space="preserve"><value>Detailed progress temporarily unavailable</value></data>
+  <data name="PhaseWaiting" xml:space="preserve"><value>Initializing NX and waiting for feedback</value></data>
+  <data name="PhaseChecking" xml:space="preserve"><value>Export stage ended. Checking the Worker result.</value></data>
+  <data name="PhaseSaveStep" xml:space="preserve"><value>Validate and save safely</value></data>
+  <data name="PhaseElapsed" xml:space="preserve"><value>Elapsed {0}</value></data>
+  <data name="PhaseLegend" xml:space="preserve"><value>Solid = processed, stripes = current file</value></data>
+  <data name="StepInitializing" xml:space="preserve"><value>Initializing the NX environment</value></data>
+  <data name="StepReady" xml:space="preserve"><value>NX is ready</value></data>
+  <data name="StepCheckingItem" xml:space="preserve"><value>Checking output conditions</value></data>
+  <data name="StepOpening" xml:space="preserve"><value>Opening the drawing</value></data>
+  <data name="StepInspecting" xml:space="preserve"><value>Inspecting drawing sheets</value></data>
+  <data name="StepUpdating" xml:space="preserve"><value>Updating drawing views</value></data>
+  <data name="StepGeneratingPdf" xml:space="preserve"><value>Generating the temporary PDF</value></data>
+  <data name="StepClosing" xml:space="preserve"><value>Closing the drawing and checking the source</value></data>
+  <data name="StepBetweenItems" xml:space="preserve"><value>File result recorded</value></data>
+  <data name="StepFinished" xml:space="preserve"><value>Export stage ended. Waiting for the Worker to exit.</value></data>
+  <data name="StepFaulted" xml:space="preserve"><value>Worker stopped. Waiting to check the result.</value></data>
+  <data name="PhaseCancelRequested" xml:space="preserve"><value>Cancellation requested. Finishing the current file.</value></data>
 </root>

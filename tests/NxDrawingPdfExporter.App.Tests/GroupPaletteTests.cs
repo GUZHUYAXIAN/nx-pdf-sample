@@ -57,6 +57,18 @@ public sealed class GroupPaletteTests
     }
 
     [TestMethod]
+    public void AnAbsentDirectoryHueRemainsReservedForWhenItReturns()
+    {
+        var theme = ThemeCatalog.Load(AppContext.BaseDirectory)[0];
+        var analysis = new PaletteAnalysis([Color.Navy], 0, 1, [new(Color.Navy, Color.Navy)]);
+        var groups = Groups(2);
+        var first = GroupPaletteResolver.Resolve(analysis, theme, new(), [groups[0]], new Dictionary<string, double>());
+        var known = first.ToDictionary(pair => pair.Key, pair => pair.Value.Hue, StringComparer.OrdinalIgnoreCase);
+        var second = GroupPaletteResolver.Resolve(analysis, theme, new(), [groups[1]], known);
+        Assert.AreNotEqual(first[groups[0].DirectoryKey].Hue, second[groups[1].DirectoryKey].Hue);
+    }
+
+    [TestMethod]
     public void StrengthZeroKeepsMarkerAndIncreasingStrengthKeepsHue()
     {
         var zero = GroupPaletteResolver.Style(187, new(GroupColorStrength: 0));

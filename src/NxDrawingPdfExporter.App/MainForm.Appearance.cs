@@ -89,13 +89,13 @@ public sealed partial class MainForm
         {
             themeRenderer?.Cancel();
             appearance = before;
-            groupHues = beforeHues;
             var restore = prePreviewFrame;
             prePreviewFrame = null;
             if (restore is not null && restore.Request.HighContrast == SystemInformation.HighContrast)
                 AcceptFrame(restore);
             else
                 restore?.Dispose();
+            groupHues = beforeHues;
             RequestThemeFrame();
         }
     }
@@ -113,8 +113,6 @@ public sealed partial class MainForm
                 WarnThemeUnavailable();
             return;
         }
-        if (appearance.Theme?.Id != theme.Id || !StringComparer.OrdinalIgnoreCase.Equals(appearance.Path, path))
-            groupHues = new(StringComparer.OrdinalIgnoreCase);
         appearance = (theme, (effects ?? theme.Defaults).Normalize(), path);
         RequestThemeFrame();
     }
@@ -145,8 +143,10 @@ public sealed partial class MainForm
                 appearanceDialog?.FrameReady(current);
             return;
         }
+        var sameAsset = previous?.Theme.Id == theme.Id && StringComparer.OrdinalIgnoreCase.Equals(previous.ImagePath, path);
         var request = new ThemeRenderRequest(++themeRevision, path, size, theme, effects, highContrast,
-            sameAppearance ? frame?.Palette : null, groups, new Dictionary<string, double>(groupHues, StringComparer.OrdinalIgnoreCase));
+            sameAppearance ? frame?.Palette : null, groups, sameAsset
+                ? new Dictionary<string, double>(groupHues, StringComparer.OrdinalIgnoreCase) : null);
         if (highContrast || path is null || effects.ImageVisibility == 0)
         {
             themeRenderer.Cancel();
@@ -159,6 +159,9 @@ public sealed partial class MainForm
     private void AcceptFrame(ThemeFrame next)
     {
         var previous = frame;
+        if (previous?.Request.Theme.Id != next.Request.Theme.Id
+            || !StringComparer.OrdinalIgnoreCase.Equals(previous.Request.ImagePath, next.Request.ImagePath))
+            groupHues = new(StringComparer.OrdinalIgnoreCase);
         frame = next;
         if (next.Materials is { } skin)
             foreach (var pair in skin.Styles)
@@ -223,7 +226,7 @@ public sealed partial class MainForm
         };
         foreach (var grid in new[] { preflight, results, manualGrid })
         {
-            grid.Group = row => grid.Rows[row].Tag is GridRow data && data.Group.Length > 0 ? GroupVisualKey.FromSource(data.Source, data.Group) : null;
+            grid.Group = row => (grid.Rows[row].Tag as GridRow)?.VisualGroup;
             grid.RowStatus = row => grid.Rows[row].Tag is GridRow data ? data.Role : SkinTextRole.Body;
             grid.CellMouseEnter += (_, e) =>
             {
@@ -243,6 +246,8 @@ public sealed partial class MainForm
         var materials = frame.Materials;
         var sample = frame.Backdrop?.GetPixel(0, 0) ?? palette.Surface;
         BackColor = palette.Background;
+        progress.SetPalette(ProgressPaletteResolver.Resolve(frame.Backdrop is null ? null : frame.Analysis, palette, frame.Request.Effects, frame.Palette,
+            SystemInformation.HighContrast));
         ThemeControlStyler.Apply(shell, palette, backdrop);
         shell.BackColor = palette.Background;
         menu.Renderer = SystemInformation.HighContrast ? new ToolStripSystemRenderer()

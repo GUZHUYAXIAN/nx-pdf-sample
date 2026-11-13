@@ -9,7 +9,10 @@ namespace NxDrawingPdfExporter.App;
 public sealed partial class MainForm
 {
     private sealed record GridRow(string Source, string Target, string Group, string Status, string Reason,
-        string Technical = "", PlannedOutputItem? Plan = null, SkinTextRole Role = SkinTextRole.Body);
+        string Technical = "", PlannedOutputItem? Plan = null, SkinTextRole Role = SkinTextRole.Body)
+    {
+        internal GroupVisualKey? VisualGroup { get; } = Group.Length == 0 ? null : GroupVisualKey.FromSource(Source, Group);
+    }
 
     private IReadOnlyDictionary<string, (int Ordinal, string Group)> runRows =
         new Dictionary<string, (int, string)>(StringComparer.OrdinalIgnoreCase);

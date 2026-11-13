@@ -60,6 +60,20 @@ public sealed partial class MainForm : Form
 
     private void WireEvents()
     {
+        controller.ProgressChanged += () =>
+        {
+            if (IsDisposed || !IsHandleCreated)
+                return;
+            if (InvokeRequired)
+                BeginInvoke(UpdateRunProgress);
+            else
+                UpdateRunProgress();
+        };
+        var elapsedTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+        elapsedTimer.Tick += (_, _) => { if (controller.IsBusy) UpdateRunProgress(); };
+        Shown += (_, _) => elapsedTimer.Start();
+        Disposed += (_, _) => elapsedTimer.Dispose();
+
         controller.StateChanged += () =>
         {
             if (IsDisposed)
@@ -308,11 +322,9 @@ public sealed partial class MainForm : Form
         inspect.Enabled = !controller.IsBusy;
         start.Enabled = state.EnableStart && controller.Session.CurrentPlan is { HasBlockingIssues: false, Items.Count: > 0 }
             && !controller.Session.IsStale && !controller.Session.HasInvalidEdit;
-        cancel.Enabled = controller.IsBusy;
         preflight.Columns["Rev"]!.ReadOnly = controller.IsBusy;
         batchRevision.Enabled = restoreRevision.Enabled = !controller.IsBusy && revision.Checked && !controller.Session.IsStale;
-        progress.Style = controller.IsBusy ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
-        progressText.Text = closePending ? Ui.Get("PendingClose") : controller.ProgressText;
+        UpdateRunProgress();
         summary.Text = controller.SummaryText;
         toggleSettings.Text = (settingsExpanded ? "▾ " : "▸ ") + Ui.Get("Settings");
         settingsSummary.Text = Ui.Get("SettingsSummary", controller.SelectedNx?.Profile.Label ?? Ui.Get("NxUnselected"),
@@ -363,7 +375,7 @@ public sealed partial class MainForm : Form
     private void RequestCancel()
     {
         try { controller.Cancel(); }
-        catch (Exception error) { Notify("RunError", details: error.Message); }
+        catch (Exception error) { Notify("CancelDeliveryFailed", details: error.Message); }
     }
 
     protected override void OnFormClosing(FormClosingEventArgs args)

@@ -89,14 +89,23 @@ public sealed class PreflightSession(IRevisionOutputPlanner planner)
         UpdatePlanAfterEdit();
     }
 
-    public OutputPlan Refresh()
+    public OutputPlan Refresh() => AcceptPlan(PlanInputs());
+
+    internal async Task<OutputPlan> RefreshAsync()
     {
-        CurrentPlan = PlanInputs();
-        IsStale = false;
-        return CurrentPlan;
+        var request = PlanningRequest();
+        return AcceptPlan(await Task.Run(() => planner.Plan(request)));
     }
 
-    private OutputPlan PlanInputs() => planner.Plan(new OutputPlanningRequest(Inputs, Routing, Policy, manualChoices));
+    private OutputPlan AcceptPlan(OutputPlan plan)
+    {
+        CurrentPlan = plan;
+        IsStale = false;
+        return plan;
+    }
+
+    private OutputPlanningRequest PlanningRequest() => new(Inputs, Routing, Policy, manualChoices);
+    private OutputPlan PlanInputs() => planner.Plan(PlanningRequest());
 
     private void UpdatePlanAfterEdit()
     {

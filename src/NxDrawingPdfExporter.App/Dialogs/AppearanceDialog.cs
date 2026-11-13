@@ -146,7 +146,8 @@ internal sealed class AppearanceDialog : SkinDialog
         for (var index = 0; index < sliders.Length; index++)
         {
             sliders[index].Value = current[index];
-            sliders[index].Enabled = available;
+            var isGroupStrength = index == sliders.Length - 1;
+            sliders[index].Enabled = available || isGroupStrength && !Theme.IsImageTheme && Theme.HasAssets;
         }
         direction.SelectedIndex = (int)parameter.GradientDirection;
         surface.SelectedIndex = (int)parameter.SurfaceMode;

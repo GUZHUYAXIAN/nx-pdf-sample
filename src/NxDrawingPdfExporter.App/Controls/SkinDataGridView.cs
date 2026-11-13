@@ -104,6 +104,9 @@ internal sealed class SkinDataGridView : WorkspaceGrid
                 var textBounds = Rectangle.FromLTRB(cell.Left + inset.Left + 2, cell.Top + inset.Top,
                     cell.Right - inset.Right - 2, cell.Bottom - inset.Bottom);
                 var color = material.Foreground;
+                var font = cellStyle.Font ?? Font;
+                const TextFormatFlags textFlags = TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl
+                    | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.PreserveGraphicsClipping;
                 if (e.RowIndex >= 0 && Columns[e.ColumnIndex].Name == "Status" &&
                     RowStatus?.Invoke(e.RowIndex) is SkinTextRole.Success or SkinTextRole.Warning or SkinTextRole.Error)
                 {
@@ -113,7 +116,11 @@ internal sealed class SkinDataGridView : WorkspaceGrid
                     if (!selected)
                     {
                         var status = materials.Status(role);
-                        var capsule = Rectangle.Inflate(textBounds, 2, 0);
+                        var measured = TextRenderer.MeasureText(canvas, text, font, textBounds.Size, textFlags);
+                        var width = Math.Min(textBounds.Width, measured.Width);
+                        var height = Math.Min(textBounds.Height, measured.Height);
+                        var capsule = new Rectangle(textBounds.X, textBounds.Y + (textBounds.Height - height) / 2, width, height);
+                        capsule.Inflate(2, 1);
                         BackdropSource.PaintBackdrop(canvas, capsule, origin);
                         status.Paint(canvas, capsule);
                         color = status.Foreground;
@@ -122,9 +129,7 @@ internal sealed class SkinDataGridView : WorkspaceGrid
                         new Rectangle(cell.Left - 1, textBounds.Top, inset.Left + 5, textBounds.Height), material.Foreground,
                         TextFormatFlags.NoPadding | TextFormatFlags.Top | TextFormatFlags.PreserveGraphicsClipping);
                 }
-                TextRenderer.DrawText(canvas, text, cellStyle.Font ?? Font, textBounds, color,
-                    TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl | TextFormatFlags.NoPrefix |
-                    TextFormatFlags.VerticalCenter | TextFormatFlags.PreserveGraphicsClipping);
+                TextRenderer.DrawText(canvas, text, font, textBounds, color, textFlags);
             }
             if (Focused && !isEditing && CurrentCellAddress == new Point(e.ColumnIndex, e.RowIndex))
                 ControlPaint.DrawFocusRectangle(canvas, Rectangle.Inflate(cell, -2, -2), material.Foreground, BackgroundColor);

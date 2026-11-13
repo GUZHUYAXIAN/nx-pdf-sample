@@ -32,22 +32,31 @@ internal static class GroupPaletteResolver
         var surface = light ? Color.White : Color.FromArgb(12, 18, 29);
         var basis = ColorContrast.Over(anchor, Color.FromArgb(effects.PanelOpacity * 255 / 100, surface));
         var candidates = Enumerable.Range(0, 120).Select(i => Style((anchorHue + i * 3) % 360, effects)).ToArray();
+        Color Composite(GroupStyle style) => ColorContrast.Over(basis, Color.FromArgb(Math.Max(150, style.Opacity), style.Tint));
+        var candidateColors = candidates.Select(Composite).ToArray();
+        var separation = Enumerable.Repeat(1d, candidates.Length).ToArray();
+        var spacing = Enumerable.Repeat(180d, candidates.Length).ToArray();
+        void Include(GroupStyle style)
+        {
+            var color = Composite(style);
+            for (var index = 0; index < candidates.Length; index++)
+            {
+                separation[index] = Math.Min(separation[index], PerceptualColor.Distance(color, candidateColors[index]));
+                spacing[index] = Math.Min(spacing[index], HueDistance(style.Hue, candidates[index].Hue));
+            }
+        }
+        foreach (var hue in assignedHues.Values.Distinct())
+            Include(Style(hue, effects));
         foreach (var key in keys)
         {
             if (styles.ContainsKey(key))
                 continue;
-            var unused = candidates.Where(style => styles.Values.All(existing => HueDistance(existing.Hue, style.Hue) >= 1));
-            var selected = unused.DefaultIfEmpty(Style((anchorHue + styles.Count * 137.507764) % 360, effects))
-                .MaxBy(style =>
-                {
-                    var color = ColorContrast.Over(basis, Color.FromArgb(Math.Max(150, style.Opacity), style.Tint));
-                    var separation = styles.Count == 0 ? 1 : styles.Values.Min(existing => PerceptualColor.Distance(color,
-                        ColorContrast.Over(basis, Color.FromArgb(Math.Max(150, existing.Opacity), existing.Tint))));
-                    var spacing = styles.Count == 0 ? 1 : styles.Values.Min(existing => HueDistance(existing.Hue, style.Hue)) / 180;
-                    return Math.Min(separation, PerceptualColor.Distance(color, basis)) + .07 * spacing
-                        - .006 * HueDistance(anchorHue, style.Hue) / 180;
-                });
+            var available = Enumerable.Range(0, candidates.Length).Where(index => spacing[index] >= 1).ToArray();
+            var selected = available.Length == 0 ? Style((anchorHue + styles.Count * 137.507764) % 360, effects)
+                : candidates[available.MaxBy(index => Math.Min(separation[index], PerceptualColor.Distance(candidateColors[index], basis))
+                    + .07 * spacing[index] / 180 - .006 * HueDistance(anchorHue, candidates[index].Hue) / 180)];
             styles[key] = selected;
+            Include(selected);
         }
         return new ReadOnlyDictionary<string, GroupStyle>(styles);
     }

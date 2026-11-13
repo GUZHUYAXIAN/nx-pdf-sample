@@ -139,6 +139,7 @@
   <data name="Reason.WorkerResultInvalid" xml:space="preserve"><value>Worker 结果缺失或与任务不匹配。</value></data>
   <data name="NxChanged" xml:space="preserve"><value>原 NX 安装已失效或版本发生变化，已重新检测；请确认后重新开始。</value></data>
   <data name="Preparing" xml:space="preserve"><value>正在准备运行…</value></data>
+  <data name="CancelDeliveryFailed" xml:space="preserve"><value>取消标记写入失败，当前任务继续运行。可重试取消。</value></data>
   <data name="Stopping" xml:space="preserve"><value>已请求取消，将在当前文件完成后停止。</value></data>
   <data name="NxRequired" xml:space="preserve"><value>没有经过验证的 NX 10 / NX 2506，无法开始导出。</value></data>
   <data name="NoInput" xml:space="preserve"><value>未发现任何候选 PRT 文件。</value></data>
@@ -196,4 +197,29 @@
   <data name="PreviewPending" xml:space="preserve"><value>正在本地更新预览…</value></data>
   <data name="ContrastProtection" xml:space="preserve"><value>已增强部分区域的遮罩以保持文字清晰。滑杆仍显示你的设定值。</value></data>
   <data name="GroupColorStrength" xml:space="preserve"><value>分组颜色强度</value></data>
+  <data name="PhaseExport" xml:space="preserve"><value>阶段 1/2 · 导出</value></data>
+  <data name="PhaseSave" xml:space="preserve"><value>阶段 2/2 · 校验并保存</value></data>
+  <data name="PhaseExportCounts" xml:space="preserve"><value>已处理 {0}/{1}（{2}%） · 已生成 {3} · 预检跳过 {4}</value></data>
+  <data name="PhaseSaveCounts" xml:space="preserve"><value>已处理 {0}/{1}（{2}%） · 已保存 {3}（覆盖 {4}） · 失败 {5}</value></data>
+  <data name="PhaseNoExport" xml:space="preserve"><value>0 个需要导出 · 预检跳过 {0}</value></data>
+  <data name="PhaseNoSave" xml:space="preserve"><value>无需校验保存</value></data>
+  <data name="PhaseCurrent" xml:space="preserve"><value>第 {0}/{1} 个 · {2} · {3}</value></data>
+  <data name="PhaseFeedback" xml:space="preserve"><value>详细进度暂不可用</value></data>
+  <data name="PhaseWaiting" xml:space="preserve"><value>正在初始化 NX，等待执行反馈</value></data>
+  <data name="PhaseChecking" xml:space="preserve"><value>导出阶段结束，正在核对 Worker 结果</value></data>
+  <data name="PhaseSaveStep" xml:space="preserve"><value>校验并安全保存</value></data>
+  <data name="PhaseElapsed" xml:space="preserve"><value>已用 {0}</value></data>
+  <data name="PhaseLegend" xml:space="preserve"><value>实色为已处理，条纹为当前文件</value></data>
+  <data name="StepInitializing" xml:space="preserve"><value>正在初始化 NX 环境</value></data>
+  <data name="StepReady" xml:space="preserve"><value>NX 环境已就绪</value></data>
+  <data name="StepCheckingItem" xml:space="preserve"><value>检查输出条件</value></data>
+  <data name="StepOpening" xml:space="preserve"><value>打开图纸</value></data>
+  <data name="StepInspecting" xml:space="preserve"><value>检查图纸页</value></data>
+  <data name="StepUpdating" xml:space="preserve"><value>更新制图视图</value></data>
+  <data name="StepGeneratingPdf" xml:space="preserve"><value>生成临时 PDF</value></data>
+  <data name="StepClosing" xml:space="preserve"><value>关闭图纸并检查源文件</value></data>
+  <data name="StepBetweenItems" xml:space="preserve"><value>已记录文件结果</value></data>
+  <data name="StepFinished" xml:space="preserve"><value>导出阶段结束，正在等待退出</value></data>
+  <data name="StepFaulted" xml:space="preserve"><value>Worker 已停止，等待核对结果</value></data>
+  <data name="PhaseCancelRequested" xml:space="preserve"><value>已请求取消，等待当前文件收尾</value></data>
 </root>

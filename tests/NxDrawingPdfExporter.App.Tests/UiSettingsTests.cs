@@ -41,6 +41,37 @@ public sealed class UiSettingsTests
     }
 
     [TestMethod]
+    [DataRow("", 65, false)]
+    [DataRow(",\"groupColorStrength\":\"invalid\"", 65, true)]
+    [DataRow(",\"groupColorStrength\":90", 90, false)]
+    public void SchemaTwoRecoversGroupStrengthIndependently(string field, int expected, bool recoveryExpected)
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (!File.Exists(Path.Combine(root.FullName, "NxDrawingPdfExporter.slnx")))
+            root = root.Parent ?? throw new DirectoryNotFoundException();
+        var directory = Directory.CreateDirectory(Path.Combine(root.FullName, "artifacts", "settings-tests", Guid.NewGuid().ToString("N")));
+        try
+        {
+            var path = Path.Combine(directory.FullName, "ui-settings.json");
+            File.WriteAllText(path, $$"""
+                {"schemaVersion":2,"themeId":"roxy","language":"en","fontScale":120,
+                 "themeParametersById":{"roxy":{"imageVisibility":31{{field}} } } }
+                """);
+            var store = new JsonUiSettingsStore(path);
+            var (settings, recovered) = store.Load();
+            Assert.AreEqual(recoveryExpected, recovered);
+            Assert.AreEqual("roxy", settings.ThemeId);
+            Assert.AreEqual("en", settings.Language);
+            Assert.AreEqual(120, settings.FontScale);
+            Assert.AreEqual(31, settings.ThemeParametersById["roxy"].ImageVisibility);
+            Assert.AreEqual(expected, settings.ThemeParametersById["roxy"].GroupColorStrength);
+            store.Save(settings);
+            Assert.AreEqual(expected, store.Load().Settings.ThemeParametersById["roxy"].GroupColorStrength);
+        }
+        finally { directory.Delete(recursive: true); }
+    }
+
+    [TestMethod]
     public void InvalidLayoutAndUnknownSchemaUseDefaults()
     {
         var defaults = new UiSettings();
