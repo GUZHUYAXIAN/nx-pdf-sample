@@ -38,24 +38,25 @@ internal sealed class SkinComboBox : ComboBox
 
     protected override void OnDrawItem(DrawItemEventArgs e)
     {
-        if (Backdrop?.Frame is not { Backdrop: not null, Materials: { } materials })
+        var foreground = e.ForeColor;
+        if (Backdrop?.Frame is { Backdrop: { } photo, Materials: { } materials })
         {
-            base.OnDrawItem(e);
-            return;
+            var selected = (e.State & DrawItemState.Selected) != 0;
+            var material = selected ? materials.Row(null, SkinRowState.Selected) : materials.Editor;
+            foreground = material.Foreground;
+            if ((e.State & DrawItemState.ComboBoxEdit) != 0)
+                SkinPainter.Paint(this, Backdrop, e.Graphics, e.Bounds, material);
+            else
+            {
+                using var brush = new SolidBrush(material.Composite(photo.GetPixel(0, 0)));
+                e.Graphics.FillRectangle(brush, e.Bounds);
+            }
         }
-        var edit = (e.State & DrawItemState.ComboBoxEdit) != 0;
-        var selected = (e.State & DrawItemState.Selected) != 0;
-        var material = selected ? materials.Row(null, SkinRowState.Selected) : materials.Editor;
-        if (edit)
-            SkinPainter.Paint(this, Backdrop, e.Graphics, e.Bounds, material);
         else
-        {
-            var photo = Backdrop.Frame!.Backdrop!;
-            using var brush = new SolidBrush(material.Composite(photo.GetPixel(0, 0)));
-            e.Graphics.FillRectangle(brush, e.Bounds);
-        }
-        var text = e.Index >= 0 ? GetItemText(Items[e.Index]) : Text;
-        TextRenderer.DrawText(e.Graphics, text, Font, e.Bounds, material.Foreground,
+            e.DrawBackground();
+
+        var text = e.Index >= 0 && e.Index < Items.Count ? GetItemText(Items[e.Index]) : Text;
+        TextRenderer.DrawText(e.Graphics, text, Font, e.Bounds, foreground,
             TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
         if ((e.State & DrawItemState.Focus) != 0)
             e.DrawFocusRectangle();

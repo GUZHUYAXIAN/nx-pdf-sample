@@ -4,6 +4,8 @@ using System.Windows.Forms;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NxDrawingPdfExporter.App.Configuration;
 using NxDrawingPdfExporter.App.Controls;
+using NxDrawingPdfExporter.App.Dialogs;
+using NxDrawingPdfExporter.App.Localization;
 using NxDrawingPdfExporter.App.Theming;
 
 namespace NxDrawingPdfExporter.App.Tests;
@@ -11,6 +13,82 @@ namespace NxDrawingPdfExporter.App.Tests;
 [TestClass]
 public sealed class SkinPaintingTests
 {
+    [TestMethod]
+    [DataRow("cloud", false, false)]
+    [DataRow("graphite", false, false)]
+    [DataRow("rem", false, false)]
+    [DataRow("rem", true, false)]
+    [DataRow("rem", false, true)]
+    public void ComboBoxRenderingMatchesAvailableBackdrop(string themeId, bool hideImage, bool highContrast)
+    {
+        RunSta(() =>
+        {
+            var themes = ThemeCatalog.Load(AppContext.BaseDirectory);
+            var theme = themes.Single(item => item.Id == themeId);
+            var ui = new UiText { Language = "zh-CN" };
+            using var dialog = new AppearanceDialog(ui, new UiSettings { ThemeId = themeId }, themes,
+                new ImportedImageStore(AppContext.BaseDirectory), (_, _, _) => { }, _ => { });
+            using var nxHost = new Form();
+            using var nxPicker = new SkinComboBox { Width = 350, DropDownStyle = ComboBoxStyle.DropDownList, FormattingEnabled = true };
+            nxPicker.Format += (_, args) => args.Value = "NX " + args.ListItem;
+            nxPicker.Items.AddRange(["10", "2506"]);
+            nxPicker.SelectedIndex = 1;
+            nxHost.Controls.Add(nxPicker);
+            var pickers = Descendants(dialog).OfType<SkinComboBox>().ToArray();
+            Assert.HasCount(3, pickers);
+            var themePicker = pickers.Single(picker => picker.SelectedItem is ThemeDefinition);
+            Assert.AreEqual(ui.Get("Theme." + themeId), themePicker.GetItemText(themePicker.SelectedItem));
+            Assert.HasCount(themes.Count, themePicker.Items.Cast<object>());
+            Assert.AreEqual("NX 2506", nxPicker.GetItemText(nxPicker.SelectedItem));
+
+            var parameters = hideImage ? theme.Defaults with { ImageVisibility = 0 } : theme.Defaults;
+            using var frame = ThemeFrame.Render(new(1, theme.ImagePath, new Size(160, 120), theme, parameters, highContrast), default);
+            var primary = new SkinButton { Tag = "Primary" };
+            nxHost.Controls.Add(primary);
+            var selectedIndices = pickers.Append(nxPicker).Select(picker => picker.SelectedIndex).ToArray();
+            foreach (var picker in pickers.Append(nxPicker))
+                _ = picker.Handle;
+            ThemeControlStyler.Apply(dialog, theme, new WindowBackdrop(dialog, () => frame));
+            ThemeControlStyler.Apply(nxHost, theme, new WindowBackdrop(nxHost, () => frame));
+            var expected = theme.IsImageTheme && !hideImage && !highContrast ? DrawMode.OwnerDrawFixed : DrawMode.Normal;
+            var index = 0;
+            foreach (var picker in pickers.Append(nxPicker))
+            {
+                Assert.AreEqual(expected, picker.DrawMode, picker.GetItemText(picker.SelectedItem));
+                Assert.AreEqual(selectedIndices[index++], picker.SelectedIndex);
+                Assert.IsFalse(string.IsNullOrWhiteSpace(picker.GetItemText(picker.SelectedItem)));
+            }
+            if (expected == DrawMode.Normal)
+                Assert.AreEqual(theme.Accent, primary.BackColor);
+        });
+
+        static IEnumerable<Control> Descendants(Control parent) => parent.Controls.Cast<Control>()
+            .SelectMany(child => Descendants(child).Prepend(child));
+    }
+
+    [TestMethod]
+    [DataRow(DrawItemState.Default)]
+    [DataRow(DrawItemState.ComboBoxEdit)]
+    public void OwnerDrawFallbackPaintsTextWhenAFrameHasNoPhoto(DrawItemState state)
+    {
+        RunSta(() =>
+        {
+            using var picker = new SkinComboBox { DrawMode = DrawMode.OwnerDrawFixed, DropDownStyle = ComboBoxStyle.DropDownList };
+            picker.Items.Add("NX 2506");
+            picker.SelectedIndex = 0;
+            using var canvas = new Bitmap(180, 28);
+            using var graphics = Graphics.FromImage(canvas);
+            graphics.Clear(Color.Red);
+            var args = new DrawItemEventArgs(graphics, picker.Font, new Rectangle(Point.Empty, canvas.Size),
+                state == DrawItemState.ComboBoxEdit ? -1 : 0, state, Color.Black, Color.White);
+            var draw = typeof(SkinComboBox).GetMethod("OnDrawItem", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            draw.Invoke(picker, [args]);
+            Assert.AreEqual(Color.White.ToArgb(), canvas.GetPixel(179, 27).ToArgb());
+            Assert.IsTrue(Enumerable.Range(0, 120).Any(x => Enumerable.Range(0, canvas.Height)
+                .Any(y => canvas.GetPixel(x, y).GetBrightness() < .45f)));
+        });
+    }
+
     [TestMethod]
     public void ScrollingReadOfNativeEditorKeepsUncommittedTextSeparate()
     {

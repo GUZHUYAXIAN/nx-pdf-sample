@@ -6,11 +6,12 @@ internal static class ThemeControlStyler
 {
     internal static void Apply(Control root, ThemeDefinition palette, IBackdropSource? backdrop)
     {
-        var materials = backdrop?.Frame?.Materials;
+        var frame = backdrop?.Frame;
+        var materials = frame?.Materials;
         var body = materials?.Body;
         var editor = materials?.Editor;
-        var photo = materials is not null;
-        var referenceColor = backdrop?.Frame?.Backdrop?.GetPixel(0, 0) ?? palette.Background;
+        var photo = frame is { Backdrop: not null, Materials: not null };
+        var referenceColor = frame?.Backdrop?.GetPixel(0, 0) ?? palette.Background;
         var surface = body?.Composite(referenceColor) ?? palette.Surface;
         var foreground = body?.Foreground ?? palette.Foreground;
 
@@ -43,12 +44,12 @@ internal static class ThemeControlStyler
                     break;
             }
 
-            if (control is Label or RadioButton or CheckBox && photo)
+            if (control is Label or RadioButton or CheckBox && materials is not null)
             {
                 control.BackColor = Color.Transparent;
-                if (control.Parent is SkinSurface parent && materials is not null)
+                if (control.Parent is SkinSurface parent)
                     control.ForeColor = (parent.Header ? materials.Header : materials.Row(parent.Group, SkinRowState.Normal)).Foreground;
-                else if (control.Parent is SkinFlowPanel && materials is not null)
+                else if (control.Parent is SkinFlowPanel)
                     control.ForeColor = materials.Header.Foreground;
             }
 
