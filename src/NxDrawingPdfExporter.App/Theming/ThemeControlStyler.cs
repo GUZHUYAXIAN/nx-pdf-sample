@@ -33,9 +33,7 @@ internal static class ThemeControlStyler
                     text.ForeColor = editor?.Foreground ?? foreground;
                     break;
                 case SkinComboBox combo:
-                    combo.Backdrop = backdrop;
-                    combo.DrawMode = photo ? DrawMode.OwnerDrawFixed : DrawMode.Normal;
-                    combo.ItemHeight = Math.Max(combo.Font.Height + 6, 16);
+                    combo.ApplyBackdrop(backdrop);
                     combo.BackColor = editor?.Composite(referenceColor) ?? surface;
                     combo.ForeColor = editor?.Foreground ?? foreground;
                     break;

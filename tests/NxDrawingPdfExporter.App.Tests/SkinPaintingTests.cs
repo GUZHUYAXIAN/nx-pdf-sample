@@ -67,6 +67,33 @@ public sealed class SkinPaintingTests
     }
 
     [TestMethod]
+    public void PhotoDropdownGrowsWhenInterfaceFontIncreases()
+    {
+        RunSta(() =>
+        {
+            var theme = ThemeCatalog.Load(AppContext.BaseDirectory).Single(item => item.Id == "rem");
+            using var form = new Form();
+            using var small = new Font("Microsoft YaHei UI", 9);
+            using var large = new Font("Microsoft YaHei UI", 18);
+            form.Font = small;
+            var picker = new SkinComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+            picker.Items.AddRange(["NX 10", "NX 2506"]);
+            picker.SelectedIndex = 1;
+            form.Controls.Add(picker);
+            using var frame = ThemeFrame.Render(new(1, theme.ImagePath, new Size(160, 120), theme, theme.Defaults, false), default);
+            _ = picker.Handle;
+            ThemeControlStyler.Apply(form, theme, new WindowBackdrop(form, () => frame));
+            var originalHeight = picker.ItemHeight;
+
+            form.Font = large;
+
+            Assert.IsGreaterThan(originalHeight, picker.ItemHeight);
+            Assert.IsGreaterThanOrEqualTo(picker.Font.Height, picker.ItemHeight);
+            Assert.AreEqual(1, picker.SelectedIndex);
+        });
+    }
+
+    [TestMethod]
     [DataRow(DrawItemState.Default)]
     [DataRow(DrawItemState.ComboBoxEdit)]
     public void OwnerDrawFallbackPaintsTextWhenAFrameHasNoPhoto(DrawItemState state)

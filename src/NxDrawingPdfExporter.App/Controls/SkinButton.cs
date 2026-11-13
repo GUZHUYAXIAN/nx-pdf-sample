@@ -34,7 +34,32 @@ internal sealed class SkinButton : Button
 
 internal sealed class SkinComboBox : ComboBox
 {
-    internal IBackdropSource? Backdrop;
+    internal void ApplyBackdrop(IBackdropSource? source)
+    {
+        Backdrop = source;
+        DrawMode = source?.Frame is { Backdrop: not null, Materials: not null } ? DrawMode.OwnerDrawFixed : DrawMode.Normal;
+        UpdateItemHeight();
+    }
+
+    private IBackdropSource? Backdrop { get; set; }
+
+    protected override void OnFontChanged(EventArgs e)
+    {
+        base.OnFontChanged(e);
+        UpdateItemHeight();
+    }
+
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+        base.OnDpiChangedAfterParent(e);
+        UpdateItemHeight();
+    }
+
+    private void UpdateItemHeight()
+    {
+        if (DrawMode == DrawMode.OwnerDrawFixed)
+            ItemHeight = Font.Height + Math.Max(1, 6 * DeviceDpi / 96);
+    }
 
     protected override void OnDrawItem(DrawItemEventArgs e)
     {
