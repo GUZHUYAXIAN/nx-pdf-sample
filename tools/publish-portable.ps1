@@ -1,4 +1,4 @@
-# Builds the portable release package:
+﻿# Builds the portable release package:
 #   package\
 #     NX图纸批量导出工具.exe      (GUI, win-x64 self-contained single file)
 #     worker\                     (net48 x64 worker files, no Siemens binaries)
